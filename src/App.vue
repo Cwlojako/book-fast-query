@@ -1,14 +1,19 @@
 <template>
-  <el-row class="search_wrap" :gutter="20">
+  <el-row class="search_wrap">
 		<el-col :span="20">
 			<el-input v-model="isbn" clearable style="width: 100%;" placeholder="请输入isbn编号,多个时请用;分割开"/>
 		</el-col>
-		<el-col :span="4">
+		<el-col :span="3" :offset="1">
 			<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 		</el-col>
   </el-row>
 	<el-row class="table_wrap">
-		<el-table :data="tableData" style="width: 100%" stripe>
+		<el-table
+			:data="tableData"
+			:row-class-name="rowClassName"
+			style="width: 100%"
+			stripe
+			border>
 			<el-table-column prop="bookName" label="书名" />
 			<el-table-column prop="isbn" label="ISBN编号" />
 			<el-table-column prop="price" label="价格" />
@@ -53,6 +58,19 @@ const platformComp = computed(() => {
 		}
 	}
 })
+
+const rowClassName = ({ row }) => {
+	switch (row.platform) {
+			case 'y':
+				return 'danger-row'
+			case 'x':
+				return 'success-row'
+			case 'k':
+				return 'warning-row'
+			case 'xc':
+				return 'primary-row'
+		}
+}
 
 async function ylSearch() {
 	let obj = { isbn: isbn.value, platform: 'y' }
@@ -138,9 +156,21 @@ function onSearch() {
 
 <style lang="scss" scoped>
 	.search_wrap {
-		padding: 20px 32px;
+		padding: 20px 32px 10px 32px;
 	}
 	.table_wrap {
-		padding: 20px 32px;
+		padding: 10px 32px;
+		::v-deep .danger-row {
+			background-color: #fef0f0;
+		}
+		::v-deep .success-row {
+			background-color: #f0f9eb;
+		}
+		::v-deep .warning-row {
+			background-color: #fdf6ec;
+		}
+		::v-deep .primary-row {
+			background-color: #ecf5ff;
+		}
 	}
 </style>
