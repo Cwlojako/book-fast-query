@@ -1,7 +1,14 @@
 <template>
   <el-row class="search_wrap">
 		<el-col :span="20">
-			<el-input v-model="isbn" clearable style="width: 100%;" placeholder="请输入isbn编号,多个时请用;分割开"/>
+			<el-input
+				v-model="isbn"
+				clearable
+				style="width: 100%;"
+				placeholder="请输入isbn编号,多个时请用;分割开"
+				@clear="onClear"
+				@keyup.enter="onSearch"
+			/>
 		</el-col>
 		<el-col :span="3" :offset="1">
 			<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
@@ -126,7 +133,7 @@ async function xgySearch() {
 async function xcSearch() {
 	let obj = { isbn: isbn.value, platform: 'xc' }
 	const { data: res } = await axios.get(`xc/xc-app/linkitembook/searchList?pageNum=0&pageSize=10&condition=${isbn.value}&typeId=&typeId2=&isStock=0&isPriceSort=0`)
-	if (res.data.total && res.data.list[0].isbn === isbn.value) {
+	if (res.data && res.data.total && res.data.list[0].isbn === isbn.value) {
 		const l = res.data.list[0]
 		obj.bookName = l.title
 		obj.cover = l.image
@@ -152,6 +159,10 @@ function onSearch() {
 	// 星辰
 	xcSearch()
 }
+
+function onClear() {
+	tableData.value = []
+}
 </script>
 
 <style lang="scss" scoped>
@@ -160,16 +171,16 @@ function onSearch() {
 	}
 	.table_wrap {
 		padding: 10px 32px;
-		::v-deep .danger-row {
+		::v-deep(.danger-row) {
 			background-color: #fef0f0;
 		}
-		::v-deep .success-row {
+		::v-deep(.success-row) {
 			background-color: #f0f9eb;
 		}
-		::v-deep .warning-row {
+		::v-deep(.warning-row) {
 			background-color: #fdf6ec;
 		}
-		::v-deep .primary-row {
+		::v-deep(.primary-row) {
 			background-color: #ecf5ff;
 		}
 	}
