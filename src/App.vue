@@ -1,47 +1,59 @@
 <template>
-  <el-row class="search_wrap">
-		<el-col :span="20">
-			<el-input
-				v-model="isbn"
-				clearable
-				style="width: 100%;"
-				placeholder="请输入isbn编号,多个时请用;分割开"
-				@clear="onClear"
-				@keyup.enter="onSearch"
-			/>
-		</el-col>
-		<el-col :span="3" :offset="1">
-			<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
-		</el-col>
-  </el-row>
-	<el-row class="table_wrap">
-		<el-table
-			:data="tableData"
-			:row-class-name="rowClassName"
-			style="width: 100%"
-			stripe
-			border>
-			<el-table-column prop="bookName" label="书名" />
-			<el-table-column prop="isbn" label="ISBN编号" />
-			<el-table-column prop="price" label="价格" />
-			<el-table-column prop="stock" label="库存" />
-			<el-table-column prop="cover" label="封面">
-				<template #default="scope">
-					<el-image
-						style="width: 100px; height: 100px"
-						:src="scope.row.cover"
-						fit="contain"
-						:preview-src-list="[scope.row.cover]"
-						preview-teleported/>
-				</template>
-			</el-table-column>
-			<el-table-column prop="platform" label="平台">
-				<template #default="scope">
-					{{ platformComp(scope.row.platform) }}
-				</template>
-			</el-table-column>
-		</el-table>
-	</el-row>
+	<el-card class="card">
+		<el-row class="search_wrap">
+			<el-col :span="20">
+				<el-input
+					v-model="isbn"
+					clearable
+					style="width: 100%;"
+					placeholder="请输入isbn编号,多个时请用;分割开"
+					@clear="onClear"
+					@keyup.enter="onSearch(true)"
+				/>
+			</el-col>
+			<el-col :span="3" :offset="1">
+				<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
+			</el-col>
+		</el-row>
+		<el-row class="table_wrap">
+			<el-table
+				:data="tableData"
+				:row-class-name="rowClassName"
+				style="width: 100%"
+				border
+			>
+				<el-table-column prop="bookName" label="书名" />
+				<el-table-column prop="isbn" label="ISBN编号" />
+				<el-table-column prop="price" label="价格" />
+				<el-table-column prop="stock" label="库存">
+					<template #default="scope">
+						<span v-if="scope.row.platform !== 'k'">{{ scope.row.stock }}</span>
+						<span v-if="scope.row.platform === 'k' && scope.row.price !== '-'" :class="{ 'stock_link': !scope.row.isQuery }" @click="onQueryKfzStock(scope.row)">
+							{{ scope.row.isQuery ? scope.row.stock : '查看库存'}}
+						</span>
+					</template>
+				</el-table-column>
+				<el-table-column prop="cover" label="封面">
+					<template #default="scope">
+						<el-image
+							style="width: 80px; height: 80px"
+							:src="scope.row.cover"
+							fit="contain"
+							:preview-src-list="[scope.row.cover]"
+							preview-teleported/>
+					</template>
+				</el-table-column>
+				<el-table-column prop="platform" label="平台">
+					<template #default="scope">
+						<p>{{ platformComp(scope.row.platform) }}</p>
+						<el-tag v-if="scope.row.platform === 'k' && scope.row.price !== '-'" :type="scope.row.isBought ? 'success' : 'primary'">
+							{{ scope.row.shopName }}
+						</el-tag>
+					</template>
+				</el-table-column>
+			</el-table>
+		</el-row>
+	</el-card>
 </template>
 
 <script lang="ts" setup>
@@ -151,13 +163,49 @@ async function xcSearch() {
 	tableData.value.push(obj)
 }
 
-function onSearch() {
-	// 有路网
-	ylSearch()
-	// 小谷吖
-	xgySearch()
-	// 星辰
-	xcSearch()
+async function kfzSearch() {
+	let obj = { isbn: isbn.value, platform: 'k' }
+	const { data: res } = await axios.get(`searchkfz/pc-gw/search-web/client/pc/product/keyword/list?dataType=0&keyword=${isbn.value}&page=1&size=50&sortType=7&actionPath=sortType&userArea=12001000000`)
+	if (res.data.itemResponse.total > 0) {
+		const l = res.data.itemResponse.list
+		let arr = l.map(m => {
+			return {
+				...obj,
+				...m,
+				bookName: m.title,
+				price: (m.price + m.postage.shippingList[0].shippingFee).toFixed(2),
+				cover: m.imgBigUrl,
+				shopName: m.shopName,
+				isBought: m.isUserBoughtShop,
+				isQuery: false
+			}
+		})
+		tableData.value = tableData.value.concat(arr)
+	} else {
+		obj.bookName = '-'
+		obj.price = '-'
+		obj.stock = '-'
+		tableData.value.push(obj)
+	}
+}
+
+async function onQueryKfzStock(row) {
+	const { shopId, itemId } = row
+	const { data: html } = await axios.get(`bookkfz/${shopId}/${itemId}`)
+	row.isQuery = true
+	const $ = await cheerio.load(html)
+	if ($('.count-val').length) {
+		row.stock = $('.store-count').text()
+	} else {
+		row.stock = 1
+	}
+}
+
+async function onSearch(isReset = false) {
+	isReset && (tableData.value = [])
+	await Promise.all([ylSearch(), xgySearch(), xcSearch()])
+	// 孔夫子
+	kfzSearch()
 }
 
 function onClear() {
@@ -166,6 +214,11 @@ function onClear() {
 </script>
 
 <style lang="scss" scoped>
+	.card {
+		::v-deep(.el-card__body) {
+			padding: 0;
+		}
+	}
 	.search_wrap {
 		padding: 20px 32px 10px 32px;
 	}
@@ -182,6 +235,10 @@ function onClear() {
 		}
 		::v-deep(.primary-row) {
 			background-color: #ecf5ff;
+		}
+		.stock_link {
+			cursor: pointer;
+			color: #409EFF;
 		}
 	}
 </style>

@@ -33,6 +33,16 @@ export default defineConfig({
         target: 'https://book.xclink.cn/',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/xc/, '')
+      },
+      '/searchkfz': {
+        target: 'https://search.kongfz.com/',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/searchkfz/, '')
+      },
+      '/bookkfz': {
+        target: 'https://book.kongfz.com/',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/bookkfz/, '')
       }
     }
   }
