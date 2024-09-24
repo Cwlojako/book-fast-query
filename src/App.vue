@@ -96,26 +96,33 @@ async function ylSearch() {
 	const { data: html } = await axios.get(`/youlu/search/result3/?isbn=${isbn.value}`)
 	const $ = await cheerio.load(html)
 	if ($('.bookname').length) {
-		const bookId = $('.bookname').children()[0].attribs.href.slice(1)
-		obj.bookName = $('.bookname').text()
-		obj.cover = $('.book_face').children().first().children().first().attr('src')
-		// 获取价格
-		const { data: priceDetail } = await axios.get(`/youlu/info3/bookBuy.aspx?bookId=${bookId}`)
-		obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
-		obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : '-'
+		let arr = $('.bookname').map(async (m, el) => {
+			const bookId = $(el).children().first().attr('href').slice(1)
+			// 获取价格
+			const { data: priceDetail } = await axios.get(`/youlu/info3/bookBuy.aspx?bookId=${bookId}`)
+			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
+			obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : '-'
+			return {
+				...obj,
+				bookName: $(el).text(),
+				cover: $('.book_face').children().first().children().first().attr('src')
+			}
+		}).get()
+		const data = await Promise.all(arr)
+		tableData.value = tableData.value.concat(data)
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
 		obj.stock = '-'
+		tableData.value.push(obj)
 	}
-	tableData.value.push(obj)
 }
 
 async function xgySearch() {
 	let obj = { isbn: isbn.value, platform: 'x' }
 	const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn.value}`, {
 		headers: {
-			'authorization': 'bearer 94c1d7e9-6c2f-49d5-a29a-6997490f5805',
+			'authorization': 'bearer bfde643a-6232-4e37-b384-b6322629a453',
 			'content-type': 'application/json'
 		}
 	})
@@ -126,7 +133,7 @@ async function xgySearch() {
 		const bookId = p[0].id
 		const { data: priceDetail } = await axios.get(`/xiaoguya/mall/api/mall/product/infoById/${bookId}`, {
 			headers: {
-				'authorization': 'bearer 94c1d7e9-6c2f-49d5-a29a-6997490f5805',
+				'authorization': 'bearer bfde643a-6232-4e37-b384-b6322629a453',
 				'content-type': 'application/json'
 			}
 		})
