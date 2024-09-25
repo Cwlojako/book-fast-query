@@ -1,7 +1,7 @@
 <template>
 	<el-card class="card">
 		<el-row class="search_wrap">
-			<el-col :span="20">
+			<el-col :span="16">
 				<el-input
 					v-model="isbn"
 					clearable
@@ -14,6 +14,9 @@
 			<el-col :span="3" :offset="1">
 				<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 			</el-col>
+			<el-col :span="3" :offset="1">
+				<el-button type="warning" @click="onResetToken" style="width: 100%;">重置小谷Token</el-button>
+			</el-col>
 		</el-row>
 		<el-row class="table_wrap">
 			<el-table
@@ -24,7 +27,20 @@
 			>
 				<el-table-column prop="bookName" label="书名" />
 				<el-table-column prop="isbn" label="ISBN编号" />
-				<el-table-column prop="price" label="价格" />
+				<el-table-column prop="price" label="价格">
+					<template #default="scope">
+						<div class="price_box">
+							<span v-if="scope.row.platform !== 'k'">{{ scope.row.price }}</span>
+							<span v-else>
+								{{ scope.row.price }}
+								<el-tag type="success">
+									{{ scope.row.qualityText }}
+								</el-tag>
+							</span>
+						</div>
+					</template>
+				</el-table-column>
+				<el-table-column prop="originPrice" label="原价" />
 				<el-table-column prop="stock" label="库存">
 					<template #default="scope">
 						<span v-if="scope.row.platform !== 'k'">{{ scope.row.stock }}</span>
@@ -57,11 +73,13 @@
 </template>
 
 <script lang="ts" setup>
+import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 
 const isbn = ref('')
 const tableData = ref([])
+const token = ref(localStorage.getItem('xgToken') || '94c1d7e9-6c2f-49d5-a29a-6997490f5805')
 
 const platformComp = computed(() => {
 	return (platform) => {
@@ -98,6 +116,7 @@ async function ylSearch() {
 	if ($('.bookname').length) {
 		let arr = $('.bookname').map(async (m, el) => {
 			const bookId = $(el).children().first().attr('href').slice(1)
+			obj.originPrice = $('.listPrice').text().slice(1)
 			// 获取价格
 			const { data: priceDetail } = await axios.get(`/youlu/info3/bookBuy.aspx?bookId=${bookId}`)
 			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
@@ -120,33 +139,41 @@ async function ylSearch() {
 
 async function xgySearch() {
 	let obj = { isbn: isbn.value, platform: 'x' }
-	const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn.value}`, {
-		headers: {
-			'authorization': 'bearer bfde643a-6232-4e37-b384-b6322629a453',
-			'content-type': 'application/json'
-		}
-	})
-	if (res.data.products) {
-		const p = res.data.products
-		obj.bookName = p[0].name
-		obj.cover = p[0].image
-		const bookId = p[0].id
-		const { data: priceDetail } = await axios.get(`/xiaoguya/mall/api/mall/product/infoById/${bookId}`, {
+	token.value = localStorage.getItem('xgToken')
+	try {
+		const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn.value}`, {
 			headers: {
-				'authorization': 'bearer bfde643a-6232-4e37-b384-b6322629a453',
+				'authorization': `bearer ${token.value}`,
 				'content-type': 'application/json'
 			}
 		})
-		let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
-		let hasStockItem = specs.find(f => f.stock > 0)
-		obj.price = hasStockItem ? hasStockItem.price : '-'
-		obj.stock = hasStockItem ? hasStockItem.stock : '-'
-	} else {
-		obj.bookName = '-'
-		obj.price = '-'
-		obj.stock = '-'
+		if (res.data.products) {
+			const p = res.data.products
+			obj.bookName = p[0].name
+			obj.cover = p[0].image
+			obj.originPrice = p[0].price
+			const bookId = p[0].id
+			const { data: priceDetail } = await axios.get(`/xiaoguya/mall/api/mall/product/infoById/${bookId}`, {
+				headers: {
+					'authorization': `bearer ${token.value}`,
+					'content-type': 'application/json'
+				}
+			})
+			let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
+			let hasStockItem = specs.find(f => f.stock > 0)
+			obj.price = hasStockItem ? hasStockItem.price : '-'
+			obj.stock = hasStockItem ? hasStockItem.stock : '-'
+		} else {
+			obj.bookName = '-'
+			obj.price = '-'
+			obj.stock = '-'
+		}
+		tableData.value.push(obj)
+	} catch(err) {
+		if (err.status === 401) {
+			ElMessage.error('小谷Token已过期，请点击重置小谷Token')
+		}
 	}
-	tableData.value.push(obj)
 }
 
 async function xcSearch() {
@@ -162,6 +189,7 @@ async function xcSearch() {
 		let hasStockItem = specs.find(f => f.inventory > 0)
 		obj.price = hasStockItem ? hasStockItem.nowPrice : '-'
 		obj.stock = hasStockItem ? hasStockItem.inventory : '-'
+		obj.originPrice = hasStockItem ? hasStockItem.integralPrice : '-'
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
@@ -180,7 +208,7 @@ async function kfzSearch() {
 				...obj,
 				...m,
 				bookName: m.title,
-				price: (m.price + m.postage.shippingList[0].shippingFee).toFixed(2),
+				price: getKfzPrice(m),
 				cover: m.imgBigUrl,
 				shopName: m.shopName,
 				isBought: m.isUserBoughtShop,
@@ -193,6 +221,18 @@ async function kfzSearch() {
 		obj.price = '-'
 		obj.stock = '-'
 		tableData.value.push(obj)
+	}
+}
+
+function getKfzPrice(m) {
+	let shippingPrice = 0
+	if (m.postage.shippingList.length) {
+		const s = m.postage.shippingList[0]
+		const { freeShippingFee, shippingFee } = s
+		shippingPrice = (freeShippingFee && m.price > freeShippingFee) ? 0 : shippingFee
+		return (m.price + shippingPrice).toFixed(2)
+	} else {
+		return m.price
 	}
 }
 
@@ -213,6 +253,17 @@ async function onSearch(isReset = false) {
 	await Promise.all([ylSearch(), xgySearch(), xcSearch()])
 	// 孔夫子
 	kfzSearch()
+}
+
+function onResetToken() {
+	ElMessageBox.prompt('请输入新的Token', '提示', {
+    confirmButtonText: 'OK',
+    cancelButtonText: 'Cancel'
+	})
+	.then(({ value }) => {
+		localStorage.setItem('xgToken', value)
+	})
+	.catch(() => {})
 }
 
 function onClear() {
@@ -246,6 +297,11 @@ function onClear() {
 		.stock_link {
 			cursor: pointer;
 			color: #409EFF;
+		}
+		.price_box {
+			.el-tag {
+				vertical-align: bottom;
+			}
 		}
 	}
 </style>

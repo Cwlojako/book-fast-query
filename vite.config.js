@@ -17,6 +17,7 @@ export default defineConfig({
     })
   ],
   server: {
+    host: '0.0.0.0',
     proxy: {
       // 有路网代理
       '/youlu': {
