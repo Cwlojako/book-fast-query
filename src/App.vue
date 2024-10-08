@@ -24,7 +24,10 @@
 				:row-class-name="rowClassName"
 				style="width: 100%"
 				border
+				@select="onSelectClick"
+				ref="table"
 			>
+				<el-table-column type="selection" width="55" />
 				<el-table-column prop="bookName" label="书名" />
 				<el-table-column prop="isbn" label="ISBN编号" />
 				<el-table-column prop="price" label="价格">
@@ -68,6 +71,37 @@
 					</template>
 				</el-table-column>
 			</el-table>
+
+			<el-badge class="selected_box" :value="selected.length" :offset="[-10, 0]" @click="onShowExcel">
+				<el-icon size="24"><Document /></el-icon>
+			</el-badge>
+
+			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
+				<template #header="{ close, titleClass }">
+					<h4 :class="titleClass">{{ new Date().toLocaleString() }}</h4>
+					<el-button type="danger" @click="close">
+						<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
+						关闭
+					</el-button>
+				</template>
+				<el-table :data="selected" style="width: 100%" :row-class-name="drawerTableClassName">
+					<el-table-column type="index" label="序号" width="80"/>
+					<el-table-column prop="bookName" label="书名" />
+					<el-table-column prop="isbn" label="ISBN编号" />
+					<el-table-column prop="price" label="价格" />
+					<el-table-column prop="stock" label="库存" />
+					<el-table-column prop="platform" label="平台" />
+					<el-table-column label="操作">
+						<template #default="scope, index">
+							<el-button type="warning" @click="onDel(scope.$index)">删除</el-button>
+						</template>
+					</el-table-column>
+				</el-table>
+				<el-row>
+					<p>总金额<b style="color: #F56C6C;">￥{{ totalPrice }}</b></p>
+					<p style="margin-left: 50px;"><b style="color: #F56C6C;">{{ totalDeliver }}</b>个快递</p>
+				</el-row>
+			</el-drawer>
 		</el-row>
 	</el-card>
 </template>
@@ -76,10 +110,16 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import { cloneDeep } from 'lodash'
 
+const table = ref()
 const isbn = ref('')
 const tableData = ref([])
 const token = ref(localStorage.getItem('xgToken') || '94c1d7e9-6c2f-49d5-a29a-6997490f5805')
+const selected = ref([])
+const drawerVisible = ref(false)
+const totalPrice = ref(0)
+const totalDeliver = ref(0)
 
 const platformComp = computed(() => {
 	return (platform) => {
@@ -107,6 +147,14 @@ const rowClassName = ({ row }) => {
 			case 'xc':
 				return 'primary-row'
 		}
+}
+
+const drawerTableClassName = ({ row }) => {
+	if (isNaN(+row.stock  && row.platform !== 'k')) {
+		return 'danger-row'
+	} else if (+row.stock <= 3 && row.platform !== 'k') {
+		return 'warning-row'
+	}
 }
 
 async function ylSearch() {
@@ -210,7 +258,6 @@ async function kfzSearch() {
 				bookName: m.title,
 				price: getKfzPrice(m),
 				cover: m.imgBigUrl,
-				shopName: m.shopName,
 				isBought: m.isUserBoughtShop,
 				isQuery: false
 			}
@@ -269,6 +316,50 @@ function onResetToken() {
 function onClear() {
 	tableData.value = []
 }
+
+function onSelectClick(selection, row) {
+	if (selection.length > 1) {
+		const del_row = selection.shift()
+		table.value.toggleRowSelection(del_row, false)
+	}
+	const target = selection[0]
+	const idx = selected.value.findIndex(f => f.isbn === target.isbn)
+	if (idx > -1) {
+		selected.value[idx] = cloneDeep(selection[0])
+	} else {
+		selected.value = cloneDeep(selected.value.concat(selection))
+	}
+	selected.value.filter(f => !f.isCalc).forEach(e => {
+		if (e.price !== '-' && +e.price < 4) {
+			e.price = 9
+			e.isCalc = true
+		} else if (e.price !== '-' && +e.price >= 4) {
+			e.price = Math.round(+e.price + 5)
+			e.isCalc = true
+		}
+	})
+}
+function onShowExcel() {
+	drawerVisible.value = true
+}
+function calcTotalPrice() {
+	totalPrice.value = selected.value.filter(f => f.stock !== '-').reduce((curr, next) => {
+		return curr + next.price
+	}, 0)
+}
+function calcTotalDeliver() {
+	const arr = selected.value.filter(f => f.stock !== '-').map(m => {
+		return m.platform !== 'k' ? m.platform : `${m.platform}${m.shopId}`
+	})
+	totalDeliver.value = new Set(arr).size
+}
+function onDrawerOpen() {
+	calcTotalPrice()
+	calcTotalDeliver()
+}
+function onDel(index) {
+	selected.value.splice(index, 1)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -303,5 +394,27 @@ function onClear() {
 				vertical-align: bottom;
 			}
 		}
+	}
+	.selected_box {
+		position: fixed;
+		right: 20px;
+		bottom: 20px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: #fff;
+		width: 50px;
+		height: 50px;
+		border-radius: 50%;
+		box-shadow: 1px 1px 12px 5px rgba(0,0,0,.08);
+		color: #333;
+		cursor: pointer;
+		z-index: 99;
+	}
+	::v-deep(.el-table__header-wrapper .cell .el-checkbox__inner) {
+		display: none !important;
+	}
+	::v-deep(.el-drawer) {
+		width: 90vw !important;
 	}
 </style>
