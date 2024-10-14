@@ -79,6 +79,14 @@
 			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
 				<template #header="{ close, titleClass }">
 					<h4 :class="titleClass">{{ new Date().toLocaleString() }}</h4>
+					<el-button type="primary" @click="onCopy">
+						<el-icon class="el-icon--left"><CopyDocument /></el-icon>
+						复制
+					</el-button>
+					<el-button type="warning" @click="onReset">
+						<el-icon class="el-icon--left"><DeleteFilled /></el-icon>
+						清空
+					</el-button>
 					<el-button type="danger" @click="close">
 						<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
 						关闭
@@ -90,7 +98,12 @@
 					<el-table-column prop="isbn" label="ISBN编号" />
 					<el-table-column prop="price" label="价格" />
 					<el-table-column prop="stock" label="库存" />
-					<el-table-column prop="platform" label="平台" />
+					<el-table-column prop="platform" label="平台">
+						<template #default="scope, index">
+							<span v-if="scope.row.platform !== 'k'">{{ scope.row.platform }}</span>
+							<span v-else>{{ `${scope.row.platform}【${scope.row.shopName}】` }}</span>
+						</template>
+					</el-table-column>
 					<el-table-column label="操作">
 						<template #default="scope, index">
 							<el-button type="warning" @click="onDel(scope.$index)">删除</el-button>
@@ -111,6 +124,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
+import useClipboard from 'vue-clipboard3'
+const { toClipboard } = useClipboard()
 
 const table = ref()
 const isbn = ref('')
@@ -150,7 +165,7 @@ const rowClassName = ({ row }) => {
 }
 
 const drawerTableClassName = ({ row }) => {
-	if (isNaN(+row.stock  && row.platform !== 'k')) {
+	if (isNaN(+row.stock) && row.platform !== 'k') {
 		return 'danger-row'
 	} else if (+row.stock <= 3 && row.platform !== 'k') {
 		return 'warning-row'
@@ -164,7 +179,7 @@ async function ylSearch() {
 	if ($('.bookname').length) {
 		let arr = $('.bookname').map(async (m, el) => {
 			const bookId = $(el).children().first().attr('href').slice(1)
-			obj.originPrice = $('.listPrice').text().slice(1)
+			obj.originPrice = $(el).next().children().first().children().last().text().slice(1)
 			// 获取价格
 			const { data: priceDetail } = await axios.get(`/youlu/info3/bookBuy.aspx?bookId=${bookId}`)
 			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
@@ -318,6 +333,10 @@ function onClear() {
 }
 
 function onSelectClick(selection, row) {
+	if (!selection.length) {
+		selected.value.shift()
+		return
+	}
 	if (selection.length > 1) {
 		const del_row = selection.shift()
 		table.value.toggleRowSelection(del_row, false)
@@ -359,6 +378,36 @@ function onDrawerOpen() {
 }
 function onDel(index) {
 	selected.value.splice(index, 1)
+	calcTotalPrice()
+	calcTotalDeliver()
+}
+function onReset() {
+	selected.value = []
+	calcTotalPrice()
+	calcTotalDeliver()
+}
+async function onCopy() {
+	let targetData = selected.value.map(m => {
+		return {
+			bookName: m.bookName.replaceAll('\n', ''),
+			isbn: m.isbn,
+			price: m.price,
+			stock: m.stock || '-',
+			platform: m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform
+		}
+	})
+	let str = ''
+	targetData.forEach(e => {
+		Object.keys(e).forEach(h => {
+			str += e[h] + '\t'
+		})
+		str += '\n'
+	})
+	await toClipboard(str)
+	ElMessage({
+		type: "success",
+		message: "复制成功",
+	})
 }
 </script>
 

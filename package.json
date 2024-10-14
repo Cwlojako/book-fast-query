@@ -14,7 +14,8 @@
     "cheerio": "^1.0.0",
     "element-plus": "^2.8.3",
     "lodash": "^4.17.21",
-    "vue": "^3.4.37"
+    "vue": "^3.4.37",
+    "vue-clipboard3": "^2.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.2",
