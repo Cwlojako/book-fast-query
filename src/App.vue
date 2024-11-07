@@ -68,6 +68,9 @@
 						<el-tag v-if="scope.row.platform === 'k' && scope.row.price !== '-'" :type="scope.row.isBought ? 'success' : 'primary'">
 							{{ scope.row.shopName }}
 						</el-tag>
+						<el-tag v-if="scope.row.platform === 'k'" type="danger">
+							{{ scope.row.shopAvgShippingTime }}
+						</el-tag>
 					</template>
 				</el-table-column>
 			</el-table>
@@ -96,7 +99,7 @@
 					<el-table-column type="index" label="序号" width="80"/>
 					<el-table-column prop="bookName" label="书名" />
 					<el-table-column prop="isbn" label="ISBN编号" />
-					<el-table-column prop="price" label="价格" />
+					<el-table-column prop="salePrice" label="售价" />
 					<el-table-column prop="stock" label="库存" />
 					<el-table-column prop="platform" label="平台">
 						<template #default="scope, index">
@@ -172,9 +175,9 @@ const drawerTableClassName = ({ row }) => {
 	}
 }
 
-async function ylSearch() {
-	let obj = { isbn: isbn.value, platform: 'y' }
-	const { data: html } = await axios.get(`/youlu/search/result3/?isbn=${isbn.value}`)
+async function ylSearch(isbn, isBatch = false) {
+	let obj = { isbn, platform: 'y' }
+	const { data: html } = await axios.get(`/youlu/search/result3/?isbn=${isbn}`)
 	const $ = await cheerio.load(html)
 	if ($('.bookname').length) {
 		let arr = $('.bookname').map(async (m, el) => {
@@ -191,20 +194,26 @@ async function ylSearch() {
 			}
 		}).get()
 		const data = await Promise.all(arr)
+		if (isBatch) {
+			return data
+		}
 		tableData.value = tableData.value.concat(data)
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
 		obj.stock = '-'
+		if (isBatch) {
+			return [obj]
+		}
 		tableData.value.push(obj)
 	}
 }
 
-async function xgySearch() {
-	let obj = { isbn: isbn.value, platform: 'x' }
+async function xgySearch(isbn, isBatch = false) {
+	let obj = { isbn, platform: 'x' }
 	token.value = localStorage.getItem('xgToken')
 	try {
-		const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn.value}`, {
+		const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn}`, {
 			headers: {
 				'authorization': `bearer ${token.value}`,
 				'content-type': 'application/json'
@@ -231,6 +240,9 @@ async function xgySearch() {
 			obj.price = '-'
 			obj.stock = '-'
 		}
+		if (isBatch) {
+			return [obj]
+		}
 		tableData.value.push(obj)
 	} catch(err) {
 		if (err.status === 401) {
@@ -239,10 +251,10 @@ async function xgySearch() {
 	}
 }
 
-async function xcSearch() {
-	let obj = { isbn: isbn.value, platform: 'xc' }
-	const { data: res } = await axios.get(`xc/xc-app/linkitembook/searchList?pageNum=0&pageSize=10&condition=${isbn.value}&typeId=&typeId2=&isStock=0&isPriceSort=0`)
-	if (res.data && res.data.total && res.data.list[0].isbn === isbn.value) {
+async function xcSearch(isbn, isBatch = false) {
+	let obj = { isbn, platform: 'xc' }
+	const { data: res } = await axios.get(`xc/xc-app/linkitembook/searchList?pageNum=0&pageSize=10&condition=${isbn}&typeId=&typeId2=&isStock=0&isPriceSort=0`)
+	if (res.data && res.data.total && res.data.list[0].isbn === isbn) {
 		const l = res.data.list[0]
 		obj.bookName = l.title
 		obj.cover = l.image
@@ -258,12 +270,15 @@ async function xcSearch() {
 		obj.price = '-'
 		obj.stock = '-'
 	}
+	if (isBatch) {
+		return [obj]
+	}
 	tableData.value.push(obj)
 }
 
-async function kfzSearch() {
-	let obj = { isbn: isbn.value, platform: 'k' }
-	const { data: res } = await axios.get(`searchkfz/pc-gw/search-web/client/pc/product/keyword/list?dataType=0&keyword=${isbn.value}&page=1&size=50&sortType=7&actionPath=sortType&userArea=12001000000`)
+async function kfzSearch(isbn, isBatch = false) {
+	let obj = { isbn, platform: 'k' }
+	const { data: res } = await axios.get(`searchkfz/pc-gw/search-web/client/pc/product/keyword/list?dataType=0&keyword=${isbn}&page=1&size=50&sortType=7&actionPath=sortType&userArea=12001000000`)
 	if (res.data.itemResponse.total > 0) {
 		const l = res.data.itemResponse.list
 		let arr = l.map(m => {
@@ -277,11 +292,17 @@ async function kfzSearch() {
 				isQuery: false
 			}
 		})
+		if (isBatch) {
+			return arr
+		}
 		tableData.value = tableData.value.concat(arr)
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
 		obj.stock = '-'
+		if (isBatch) {
+			return [obj]
+		}
 		tableData.value.push(obj)
 	}
 }
@@ -312,9 +333,48 @@ async function onQueryKfzStock(row) {
 
 async function onSearch(isReset = false) {
 	isReset && (tableData.value = [])
-	await Promise.all([ylSearch(), xgySearch(), xcSearch()])
-	// 孔夫子
-	kfzSearch()
+	if (isbn.value.split(';').length > 1) {
+		let isbns = [...new Set(isbn.value.split(';'))]
+		isbns.forEach(async e => {
+			let res = await Promise.all([ylSearch(e, true), xgySearch(e, true), xcSearch(e, true), kfzSearch(e, true)])
+			/*** 规则
+			 * 1、有小谷优先小谷
+			 * 2、没有小谷的话取星辰或有路网价格最低的
+			 * 3、再没有的话取孔夫子网的，需满足发货时长小于30小时的且价格最低的
+			 * 4、都没有的话随机取第一个
+			 */
+			const [res1, res2, res3, res4] = res
+			const totalRes = res.reduce((curr, next) => {
+				return curr.concat(...next)
+			}, [])
+			const xg = totalRes.find(f => f.platform === 'x' && f.price !== '-')
+			const min = totalRes.filter(f => f.price !== '-' && f.platform !== 'k').sort((a, b) => a.price - b.price)[0]
+			const kfz = res4.filter(f => f.shopAvgShippingTime).sort((a, b) => (+a.price + +a.shopAvgShippingTime.match(/\d+/g)[0]) - (+b.price + +b.shopAvgShippingTime.match(/\d+/g)[0]))[0]
+			if (xg) {
+				selected.value.push(xg)
+			} else {
+				if (min) {
+					selected.value.push(min)
+				} else {
+					kfz ? selected.value.push(kfz) : selected.value.push(res1[0])
+				}
+			}
+			selected.value.filter(f => !f.isCalc).forEach(e => {
+				if (e.price !== '-' && +e.price < 4) {
+					e.salePrice = 9
+					e.isCalc = true
+				} else if (e.price !== '-' && +e.price >= 4) {
+					e.salePrice = Math.round(+e.price + 5)
+					e.isCalc = true
+				}
+			})
+		})
+	} else {
+		await Promise.all([ylSearch(isbn.value), xgySearch(isbn.value), xcSearch(isbn.value)])
+		// 孔夫子
+		kfzSearch(isbn.value)
+	}
+	
 }
 
 function onResetToken() {
@@ -350,10 +410,10 @@ function onSelectClick(selection, row) {
 	}
 	selected.value.filter(f => !f.isCalc).forEach(e => {
 		if (e.price !== '-' && +e.price < 4) {
-			e.price = 9
+			e.salePrice = 9
 			e.isCalc = true
 		} else if (e.price !== '-' && +e.price >= 4) {
-			e.price = Math.round(+e.price + 5)
+			e.salePrice = Math.round(+e.price + 5)
 			e.isCalc = true
 		}
 	})
@@ -363,7 +423,7 @@ function onShowExcel() {
 }
 function calcTotalPrice() {
 	totalPrice.value = selected.value.filter(f => f.stock !== '-').reduce((curr, next) => {
-		return curr + next.price
+		return curr + (next.salePrice || 0)
 	}, 0)
 }
 function calcTotalDeliver() {
