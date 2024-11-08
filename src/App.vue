@@ -101,6 +101,16 @@
 					<el-table-column prop="isbn" label="ISBN编号" />
 					<el-table-column prop="salePrice" label="售价" />
 					<el-table-column prop="stock" label="库存" />
+					<el-table-column prop="cover" label="封面">
+						<template #default="scope">
+							<el-image
+								style="width: 80px; height: 80px"
+								:src="scope.row.cover"
+								fit="contain"
+								:preview-src-list="[scope.row.cover]"
+								preview-teleported/>
+						</template>
+					</el-table-column>
 					<el-table-column prop="platform" label="平台">
 						<template #default="scope, index">
 							<span v-if="scope.row.platform !== 'k'">{{ scope.row.platform }}</span>
@@ -109,6 +119,8 @@
 					</el-table-column>
 					<el-table-column label="操作">
 						<template #default="scope, index">
+							<el-button :icon="ICONTop" type="primary" @click="scope.row.salePrice += 1, calcTotalPrice()"/>
+							<el-button :icon="ICONBottom" type="danger" @click="scope.row.salePrice -= 1, calcTotalPrice()"/>
 							<el-button type="warning" @click="onDel(scope.$index)">删除</el-button>
 						</template>
 					</el-table-column>
@@ -124,6 +136,7 @@
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Top, Bottom } from '@element-plus/icons-vue'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
@@ -138,6 +151,8 @@ const selected = ref([])
 const drawerVisible = ref(false)
 const totalPrice = ref(0)
 const totalDeliver = ref(0)
+const ICONTop = Top
+const ICONBottom = Bottom
 
 const platformComp = computed(() => {
 	return (platform) => {
