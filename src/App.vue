@@ -1,7 +1,7 @@
 <template>
 	<el-card class="card">
-		<el-row class="search_wrap">
-			<el-col :span="16">
+		<el-row class="search_wrap" gutter="20">
+			<el-col :span="12">
 				<el-input
 					v-model="isbn"
 					clearable
@@ -11,11 +11,14 @@
 					@keyup.enter="onSearch(true)"
 				/>
 			</el-col>
-			<el-col :span="3" :offset="1">
+			<el-col :span="4">
 				<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 			</el-col>
-			<el-col :span="3" :offset="1">
+			<el-col :span="4">
 				<el-button type="warning" @click="onResetToken" style="width: 100%;">重置小谷Token</el-button>
+			</el-col>
+			<el-col :span="4">
+				<el-button type="danger" @click="onResetCookie" style="width: 100%;">重置孔夫子Cookie</el-button>
 			</el-col>
 		</el-row>
 		<el-row class="table_wrap">
@@ -95,7 +98,14 @@
 						关闭
 					</el-button>
 				</template>
-				<el-table :data="selected" style="width: 100%" :row-class-name="drawerTableClassName">
+				<el-table 
+					:data="selected"
+					style="width: 100%"
+					:row-class-name="drawerTableClassName" 
+					:row-style="{
+						maxHeight: '60px'
+					}"
+				>
 					<el-table-column type="index" label="序号" width="80"/>
 					<el-table-column prop="bookName" label="书名" />
 					<el-table-column prop="isbn" label="ISBN编号" />
@@ -104,7 +114,7 @@
 					<el-table-column prop="cover" label="封面">
 						<template #default="scope">
 							<el-image
-								style="width: 80px; height: 80px"
+								style="width: 50px; height: 50px"
 								:src="scope.row.cover"
 								fit="contain"
 								:preview-src-list="[scope.row.cover]"
@@ -119,9 +129,9 @@
 					</el-table-column>
 					<el-table-column label="操作">
 						<template #default="scope, index">
-							<el-button :icon="ICONTop" type="primary" @click="scope.row.salePrice += 1, calcTotalPrice()"/>
-							<el-button :icon="ICONBottom" type="danger" @click="scope.row.salePrice -= 1, calcTotalPrice()"/>
-							<el-button type="warning" @click="onDel(scope.$index)">删除</el-button>
+							<el-button size="small" :icon="ICONTop" type="primary" @click="scope.row.salePrice += 1, calcTotalPrice()"/>
+							<el-button size="small" :icon="ICONBottom" type="danger" @click="scope.row.salePrice -= 1, calcTotalPrice()"/>
+							<el-button size="small" :icon="ICONDelete" type="warning" @click="onDel(scope.$index)" />
 						</template>
 					</el-table-column>
 				</el-table>
@@ -136,23 +146,26 @@
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Top, Bottom } from '@element-plus/icons-vue'
+import { Top, Bottom, Delete } from '@element-plus/icons-vue'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
 import useClipboard from 'vue-clipboard3'
+import { onMounted } from 'vue'
 const { toClipboard } = useClipboard()
 
 const table = ref()
 const isbn = ref('')
 const tableData = ref([])
 const token = ref(localStorage.getItem('xgToken') || '94c1d7e9-6c2f-49d5-a29a-6997490f5805')
+const cookie = ref(localStorage.getItem('kfzCookie') || '')
 const selected = ref([])
 const drawerVisible = ref(false)
 const totalPrice = ref(0)
 const totalDeliver = ref(0)
 const ICONTop = Top
 const ICONBottom = Bottom
+const ICONDelete = Delete
 
 const platformComp = computed(() => {
 	return (platform) => {
@@ -192,14 +205,14 @@ const drawerTableClassName = ({ row }) => {
 
 async function ylSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'y' }
-	const { data: html } = await axios.get(`/youlu/search/result3/?isbn=${isbn}`)
+	const { data: html } = await axios.get(`/api/youlu?isbn=${isbn}`)
 	const $ = await cheerio.load(html)
 	if ($('.bookname').length) {
 		let arr = $('.bookname').map(async (m, el) => {
 			const bookId = $(el).children().first().attr('href').slice(1)
 			obj.originPrice = $(el).next().children().first().children().last().text().slice(1)
 			// 获取价格
-			const { data: priceDetail } = await axios.get(`/youlu/info3/bookBuy.aspx?bookId=${bookId}`)
+			const { data: priceDetail } = await axios.get(`/api/youlu/detail?bookId=${bookId}`)
 			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
 			obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : '-'
 			return {
@@ -228,19 +241,14 @@ async function xgySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'x' }
 	token.value = localStorage.getItem('xgToken')
 	try {
-		const { data: res } = await axios.get(`/xiaoguya/mall/api/mall/product/search/searchProduct?current=1&size=20&keyword=${isbn}`, {
-			headers: {
-				'authorization': `bearer ${token.value}`,
-				'content-type': 'application/json'
-			}
-		})
+		const { data: res } = await axios.get(`/api/xiaoguya?isbn=${isbn}&token=${token.value}`)
 		if (res.data.products) {
 			const p = res.data.products
 			obj.bookName = p[0].name
 			obj.cover = p[0].image
 			obj.originPrice = p[0].price
 			const bookId = p[0].id
-			const { data: priceDetail } = await axios.get(`/xiaoguya/mall/api/mall/product/infoById/${bookId}`, {
+			const { data: priceDetail } = await axios.get(`/api/xiaoguya/detail?bookId=${bookId}&token=${token.value}`, {
 				headers: {
 					'authorization': `bearer ${token.value}`,
 					'content-type': 'application/json'
@@ -268,13 +276,13 @@ async function xgySearch(isbn, isBatch = false) {
 
 async function xcSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'xc' }
-	const { data: res } = await axios.get(`xc/xc-app/linkitembook/searchList?pageNum=0&pageSize=10&condition=${isbn}&typeId=&typeId2=&isStock=0&isPriceSort=0`)
+	const { data: res } = await axios.get(`/api/xc?isbn=${isbn}`)
 	if (res.data && res.data.total && res.data.list[0].isbn === isbn) {
 		const l = res.data.list[0]
 		obj.bookName = l.title
 		obj.cover = l.image
 		const bookId = l.itemId
-		const { data: priceDetail } = await axios.get(`xc/xc-app/linkitembook/bookCondition?bookId=${bookId}`)
+		const { data: priceDetail } = await axios.get(`/api/xc/detail?bookId=${bookId}`)
 		let specs = priceDetail.data.sort((a, b) => a.nowPrice - b.nowPrice)
 		let hasStockItem = specs.find(f => f.inventory > 0)
 		obj.price = hasStockItem ? hasStockItem.nowPrice : '-'
@@ -293,7 +301,12 @@ async function xcSearch(isbn, isBatch = false) {
 
 async function kfzSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'k' }
-	const { data: res } = await axios.get(`searchkfz/pc-gw/search-web/client/pc/product/keyword/list?dataType=0&keyword=${isbn}&page=1&size=50&sortType=7&actionPath=sortType&userArea=12001000000`)
+	cookie.value = localStorage.getItem('kfzCookie')
+	const { data: res } = await axios.get(`/api/kfz?isbn=${isbn}&cookie=${cookie.value}`)
+	if (res.data.requestRejectAction === 'GO_LOGIN') {
+		ElMessage.error('孔夫子网未登录,请重试')
+		return
+	}
 	if (res.data.itemResponse.total > 0) {
 		const l = res.data.itemResponse.list
 		let arr = l.map(m => {
@@ -385,7 +398,7 @@ async function onSearch(isReset = false) {
 			})
 		})
 	} else {
-		await Promise.all([ylSearch(isbn.value), xgySearch(isbn.value), xcSearch(isbn.value)])
+		await Promise.all([xgySearch(isbn.value), xcSearch(isbn.value), ylSearch(isbn.value)])
 		// 孔夫子
 		kfzSearch(isbn.value)
 	}
@@ -403,13 +416,25 @@ function onResetToken() {
 	.catch(() => {})
 }
 
+function onResetCookie() {
+	ElMessageBox.prompt('请输入新的Cookie', '提示', {
+    confirmButtonText: 'OK',
+    cancelButtonText: 'Cancel'
+	})
+	.then(({ value }) => {
+		localStorage.setItem('kfzCookie', value)
+	})
+	.catch(() => {})
+}
+
 function onClear() {
 	tableData.value = []
 }
 
 function onSelectClick(selection, row) {
+	console.log(selection)
 	if (!selection.length) {
-		selected.value.shift()
+		selected.value.pop()
 		return
 	}
 	if (selection.length > 1) {
@@ -450,6 +475,9 @@ function calcTotalDeliver() {
 function onDrawerOpen() {
 	calcTotalPrice()
 	calcTotalDeliver()
+	selected.value.filter(f => f.platform === 'k' && f.price !== '-' && !f.isQuery).forEach(e => {
+		onQueryKfzStock(e)
+	})
 }
 function onDel(index) {
 	selected.value.splice(index, 1)
@@ -466,7 +494,7 @@ async function onCopy() {
 		return {
 			bookName: m.bookName.replaceAll('\n', ''),
 			isbn: m.isbn,
-			price: m.price,
+			salePrice: m.salePrice || '暂缺',
 			stock: m.stock || '-',
 			platform: m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform
 		}

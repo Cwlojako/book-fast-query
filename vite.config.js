@@ -20,31 +20,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     proxy: {
-      // 有路网代理
-      '/youlu': {
-        target: 'https://www.youlu.net/',
+      '/api': {
+        target: 'http://172.16.11.110:3000/',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/youlu/, '')
-      },
-      '/xiaoguya': {
-        target: 'https://api.xiaoguya.com:9898/',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/xiaoguya/, '')
-      },
-      '/xc': {
-        target: 'https://book.xclink.cn/',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/xc/, '')
-      },
-      '/searchkfz': {
-        target: 'https://search.kongfz.com/',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/searchkfz/, '')
-      },
-      '/bookkfz': {
-        target: 'https://book.kongfz.com/',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/bookkfz/, '')
+        rewrite: path => path.replace(/^\/api/, '')
       }
     }
   }
