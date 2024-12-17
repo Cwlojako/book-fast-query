@@ -154,6 +154,7 @@ import useClipboard from 'vue-clipboard3'
 import { onMounted } from 'vue'
 const { toClipboard } = useClipboard()
 
+const baseUrl = import.meta.env.VITE_BASE_URL
 const table = ref()
 const isbn = ref('')
 const tableData = ref([])
@@ -205,14 +206,14 @@ const drawerTableClassName = ({ row }) => {
 
 async function ylSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'y' }
-	const { data: html } = await axios.get(`/api/youlu?isbn=${isbn}`)
+	const { data: html } = await axios.get(`${baseUrl}/youlu?isbn=${isbn}`)
 	const $ = await cheerio.load(html)
 	if ($('.bookname').length) {
 		let arr = $('.bookname').map(async (m, el) => {
 			const bookId = $(el).children().first().attr('href').slice(1)
 			obj.originPrice = $(el).next().children().first().children().last().text().slice(1)
 			// 获取价格
-			const { data: priceDetail } = await axios.get(`/api/youlu/detail?bookId=${bookId}`)
+			const { data: priceDetail } = await axios.get(`${baseUrl}/youlu/detail?bookId=${bookId}`)
 			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
 			obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : '-'
 			return {
@@ -240,7 +241,7 @@ async function ylSearch(isbn, isBatch = false) {
 async function xgySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'x' }
 	token.value = localStorage.getItem('xgToken')
-	const { data: res } = await axios.get(`/api/xiaoguya?isbn=${isbn}&token=${token.value}`)
+	const { data: res } = await axios.get(`${baseUrl}/xiaoguya?isbn=${isbn}&token=${token.value}`)
 	if (res.code === 401) {
 		ElMessage.error(res.message)
 		return 
@@ -251,7 +252,7 @@ async function xgySearch(isbn, isBatch = false) {
 		obj.cover = p[0].image
 		obj.originPrice = p[0].price
 		const bookId = p[0].id
-		const { data: priceDetail } = await axios.get(`/api/xiaoguya/detail?bookId=${bookId}&token=${token.value}`)
+		const { data: priceDetail } = await axios.get(`${baseUrl}/xiaoguya/detail?bookId=${bookId}&token=${token.value}`)
 		let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
 		let hasStockItem = specs.find(f => f.stock > 0)
 		obj.price = hasStockItem ? hasStockItem.price : '-'
@@ -269,13 +270,13 @@ async function xgySearch(isbn, isBatch = false) {
 
 async function xcSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'xc' }
-	const { data: res } = await axios.get(`/api/xc?isbn=${isbn}`)
+	const { data: res } = await axios.get(`${baseUrl}/xc?isbn=${isbn}`)
 	if (res.data && res.data.total && res.data.list[0].isbn === isbn) {
 		const l = res.data.list[0]
 		obj.bookName = l.title
 		obj.cover = l.image
 		const bookId = l.itemId
-		const { data: priceDetail } = await axios.get(`/api/xc/detail?bookId=${bookId}`)
+		const { data: priceDetail } = await axios.get(`${baseUrl}/xc/detail?bookId=${bookId}`)
 		let specs = priceDetail.data.sort((a, b) => a.nowPrice - b.nowPrice)
 		let hasStockItem = specs.find(f => f.inventory > 0)
 		obj.price = hasStockItem ? hasStockItem.nowPrice : '-'
@@ -295,7 +296,7 @@ async function xcSearch(isbn, isBatch = false) {
 async function kfzSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'k' }
 	cookie.value = localStorage.getItem('kfzCookie')
-	const { data: res } = await axios.get(`/api/kfz?isbn=${isbn}&cookie=${cookie.value}`)
+	const { data: res } = await axios.get(`${baseUrl}/kfz?isbn=${isbn}&cookie=${cookie.value}`)
 	if (res.data.requestRejectAction === 'GO_LOGIN') {
 		ElMessage.error('孔夫子网未登录,请重试')
 		return
@@ -342,7 +343,7 @@ function getKfzPrice(m) {
 
 async function onQueryKfzStock(row) {
 	const { shopId, itemId } = row
-	const { data: html } = await axios.get(`/api/kfz/detail?shopId=${shopId}&itemId=${itemId}`)
+	const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}`)
 	row.isQuery = true
 	const $ = await cheerio.load(html)
 	if ($('.count-val').length) {
