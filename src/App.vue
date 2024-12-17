@@ -240,38 +240,31 @@ async function ylSearch(isbn, isBatch = false) {
 async function xgySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'x' }
 	token.value = localStorage.getItem('xgToken')
-	try {
-		const { data: res } = await axios.get(`/api/xiaoguya?isbn=${isbn}&token=${token.value}`)
-		if (res.data.products) {
-			const p = res.data.products
-			obj.bookName = p[0].name
-			obj.cover = p[0].image
-			obj.originPrice = p[0].price
-			const bookId = p[0].id
-			const { data: priceDetail } = await axios.get(`/api/xiaoguya/detail?bookId=${bookId}&token=${token.value}`, {
-				headers: {
-					'authorization': `bearer ${token.value}`,
-					'content-type': 'application/json'
-				}
-			})
-			let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
-			let hasStockItem = specs.find(f => f.stock > 0)
-			obj.price = hasStockItem ? hasStockItem.price : '-'
-			obj.stock = hasStockItem ? hasStockItem.stock : '-'
-		} else {
-			obj.bookName = '-'
-			obj.price = '-'
-			obj.stock = '-'
-		}
-		if (isBatch) {
-			return [obj]
-		}
-		tableData.value.push(obj)
-	} catch(err) {
-		if (err.status === 401) {
-			ElMessage.error('小谷Token已过期，请点击重置小谷Token')
-		}
+	const { data: res } = await axios.get(`/api/xiaoguya?isbn=${isbn}&token=${token.value}`)
+	if (res.code === 401) {
+		ElMessage.error(res.message)
+		return 
 	}
+	if (res.data.products) {
+		const p = res.data.products
+		obj.bookName = p[0].name
+		obj.cover = p[0].image
+		obj.originPrice = p[0].price
+		const bookId = p[0].id
+		const { data: priceDetail } = await axios.get(`/api/xiaoguya/detail?bookId=${bookId}&token=${token.value}`)
+		let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
+		let hasStockItem = specs.find(f => f.stock > 0)
+		obj.price = hasStockItem ? hasStockItem.price : '-'
+		obj.stock = hasStockItem ? hasStockItem.stock : '-'
+	} else {
+		obj.bookName = '-'
+		obj.price = '-'
+		obj.stock = '-'
+	}
+	if (isBatch) {
+		return [obj]
+	}
+	tableData.value.push(obj)
 }
 
 async function xcSearch(isbn, isBatch = false) {
@@ -398,7 +391,7 @@ async function onSearch(isReset = false) {
 			})
 		})
 	} else {
-		await Promise.all([xgySearch(isbn.value), xcSearch(isbn.value), ylSearch(isbn.value)])
+		await Promise.all([xgySearch(isbn.value)])
 		// 孔夫子
 		kfzSearch(isbn.value)
 	}
