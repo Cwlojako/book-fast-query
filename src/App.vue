@@ -349,7 +349,7 @@ function getKfzPrice(m) {
 
 async function onQueryKfzStock(row) {
 	const { shopId, itemId } = row
-	const { data: html } = await axios.get(`bookkfz/${shopId}/${itemId}`)
+	const { data: html } = await axios.get(`/api/kfz/detail?shopId=${shopId}&itemId=${itemId}`)
 	row.isQuery = true
 	const $ = await cheerio.load(html)
 	if ($('.count-val').length) {
@@ -493,7 +493,7 @@ async function onCopy() {
 	let targetData = selected.value.map(m => {
 		return {
 			bookName: m.bookName.replaceAll('\n', ''),
-			isbn: m.isbn,
+			isbn: m.platform === 'k' && m.qualityText === '全新' ? `${m.isbn}【全新】` : m.isbn,
 			salePrice: m.salePrice || '暂缺',
 			stock: m.stock || '-',
 			platform: m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform
@@ -506,6 +506,7 @@ async function onCopy() {
 		})
 		str += '\n'
 	})
+	str = `${str}总共：￥${totalPrice.value}\t${totalDeliver.value}个快递`
 	await toClipboard(str)
 	ElMessage({
 		type: "success",
