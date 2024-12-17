@@ -391,7 +391,7 @@ async function onSearch(isReset = false) {
 			})
 		})
 	} else {
-		await Promise.all([xgySearch(isbn.value)])
+		await Promise.all([xgySearch(isbn.value), xcSearch(isbn.value), ylSearch(isbn.value)])
 		// 孔夫子
 		kfzSearch(isbn.value)
 	}
