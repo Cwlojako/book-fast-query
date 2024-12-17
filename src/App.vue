@@ -343,7 +343,8 @@ function getKfzPrice(m) {
 
 async function onQueryKfzStock(row) {
 	const { shopId, itemId } = row
-	const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}`)
+	cookie.value = localStorage.getItem('kfzCookie')
+	const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}&cookie=${cookie.value}`)
 	row.isQuery = true
 	const $ = await cheerio.load(html)
 	if ($('.count-val').length) {
@@ -426,7 +427,6 @@ function onClear() {
 }
 
 function onSelectClick(selection, row) {
-	console.log(selection)
 	if (!selection.length) {
 		selected.value.pop()
 		return
@@ -444,10 +444,10 @@ function onSelectClick(selection, row) {
 	}
 	selected.value.filter(f => !f.isCalc).forEach(e => {
 		if (e.price !== '-' && +e.price < 4) {
-			e.salePrice = 9
+			e.salePrice = 10
 			e.isCalc = true
 		} else if (e.price !== '-' && +e.price >= 4) {
-			e.salePrice = Math.round(+e.price + 5)
+			e.salePrice = Math.ceil(+e.price + 5)
 			e.isCalc = true
 		}
 	})
@@ -488,7 +488,7 @@ async function onCopy() {
 		return {
 			bookName: m.bookName.replaceAll('\n', ''),
 			isbn: m.platform === 'k' && m.qualityText === '全新' ? `${m.isbn}【全新】` : m.isbn,
-			salePrice: m.salePrice || '暂缺',
+			salePrice: `￥${m.salePrice}` || '暂缺',
 			stock: m.stock || '-',
 			platform: m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform
 		}
