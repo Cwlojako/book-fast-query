@@ -78,13 +78,13 @@
 				</el-table-column>
 			</el-table>
 
-			<el-badge class="selected_box" :value="selected.length" :offset="[-10, 0]" @click="onShowExcel">
+			<el-badge class="selected_box" :value="selected.length" :offset="[-10, 0]" @click="onShowDrawer">
 				<el-icon size="24"><Document /></el-icon>
 			</el-badge>
 
 			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
 				<template #header="{ close, titleClass }">
-					<h4 :class="titleClass">{{ new Date().toLocaleString() }}</h4>
+					<h4 :class="titleClass">订单号：{{ orderNoComp }}</h4>
 					<el-button type="primary" @click="onCopy">
 						<el-icon class="el-icon--left"><CopyDocument /></el-icon>
 						复制
@@ -109,7 +109,34 @@
 					<el-table-column type="index" label="序号" width="80"/>
 					<el-table-column prop="bookName" label="书名" />
 					<el-table-column prop="isbn" label="ISBN编号" />
-					<el-table-column prop="salePrice" label="售价" />
+					<el-table-column prop="salePrice" label="售价">
+						<template #default="scope">
+							<span style="margin-right: 10px;">{{ scope.row.salePrice }}</span>
+							<el-button v-if="scope.row.salePrice" size="small" :icon="ICONTop" type="primary" @click="scope.row.salePrice += 1, calcTotalPrice()"/>
+							<el-button v-if="scope.row.salePrice" size="small" :icon="ICONBottom" type="danger" @click="scope.row.salePrice -= 1, calcTotalPrice()"/>
+						</template>
+					</el-table-column>
+					<el-table-column prop="quantity" label="数量">
+						<template #default="scope">
+							<span style="margin-right: 10px;">{{ scope.row.quantity }}</span>
+							<el-button
+								v-if="scope.row.salePrice"
+								type="primary"
+								size="small"
+								:icon="ICONPlus"
+								:disabled="scope.row.quantity === +scope.row.stock"
+								@click="scope.row.quantity += 1, calcTotalPrice()"
+							/>
+							<el-button
+								v-if="scope.row.salePrice"
+								size="small"
+								:icon="ICONMinus"
+								type="danger"
+								:disabled="scope.row.quantity === 1"
+								@click="scope.row.quantity -= 1, calcTotalPrice()"
+							/>
+						</template>
+					</el-table-column>
 					<el-table-column prop="stock" label="库存" />
 					<el-table-column prop="cover" label="封面">
 						<template #default="scope">
@@ -129,8 +156,6 @@
 					</el-table-column>
 					<el-table-column label="操作">
 						<template #default="scope, index">
-							<el-button size="small" :icon="ICONTop" type="primary" @click="scope.row.salePrice += 1, calcTotalPrice()"/>
-							<el-button size="small" :icon="ICONBottom" type="danger" @click="scope.row.salePrice -= 1, calcTotalPrice()"/>
 							<el-button size="small" :icon="ICONDelete" type="warning" @click="onDel(scope.$index)" />
 						</template>
 					</el-table-column>
@@ -146,7 +171,7 @@
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Top, Bottom, Delete } from '@element-plus/icons-vue'
+import { Top, Bottom, Delete, Plus, Minus } from '@element-plus/icons-vue'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
@@ -158,7 +183,7 @@ const baseUrl = import.meta.env.VITE_BASE_URL
 const table = ref()
 const isbn = ref('')
 const tableData = ref([])
-const token = ref(localStorage.getItem('xgToken') || '94c1d7e9-6c2f-49d5-a29a-6997490f5805')
+const token = ref(localStorage.getItem('xgToken') || '')
 const cookie = ref(localStorage.getItem('kfzCookie') || '')
 const selected = ref([])
 const drawerVisible = ref(false)
@@ -167,6 +192,8 @@ const totalDeliver = ref(0)
 const ICONTop = Top
 const ICONBottom = Bottom
 const ICONDelete = Delete
+const ICONPlus = Plus
+const ICONMinus = Minus
 
 const platformComp = computed(() => {
 	return (platform) => {
@@ -183,17 +210,36 @@ const platformComp = computed(() => {
 	}
 })
 
+const orderNoComp = computed(() => {
+	const date = new Date()
+	const year = date.getFullYear()
+	const month = date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
+	const day = date.getDate() < 10 ? `0${date.getDate()}` : date.getDate()
+
+	const totalOriginPrice = selected.value.reduce((curr, next) => {
+		return curr + (next.price === '-' ? 0 : next.price * next.quantity)
+	}, 0)
+
+	const totalSalePrice = selected.value.reduce((curr, next) => {
+		return curr + (next.salePrice ? next.salePrice * next.quantity : 0)
+	}, 0)
+
+	const profit = (totalSalePrice - totalOriginPrice).toFixed(2)
+
+	return `${year}${month}${day}-${profit}-${getRandom()}`
+})
+
 const rowClassName = ({ row }) => {
 	switch (row.platform) {
-			case 'y':
-				return 'danger-row'
-			case 'x':
-				return 'success-row'
-			case 'k':
-				return 'warning-row'
-			case 'xc':
-				return 'primary-row'
-		}
+		case 'y':
+			return 'danger-row'
+		case 'x':
+			return 'success-row'
+		case 'k':
+			return 'warning-row'
+		case 'xc':
+			return 'primary-row'
+	}
 }
 
 const drawerTableClassName = ({ row }) => {
@@ -204,6 +250,20 @@ const drawerTableClassName = ({ row }) => {
 	}
 }
 
+function getRandom() {
+	let random = Math.floor(Math.random() * 10000) + 1
+	const length = String(random).length
+	if (length < 5) {
+		for(let i = length; i < 5; i++) {
+			random = '0' + random
+		}
+		return random
+	} else {
+		return random
+	}
+}
+
+// 有路搜索
 async function ylSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'y' }
 	const { data: html } = await axios.get(`${baseUrl}/youlu?isbn=${isbn}`)
@@ -238,6 +298,7 @@ async function ylSearch(isbn, isBatch = false) {
 	}
 }
 
+// 小谷吖搜索
 async function xgySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'x' }
 	token.value = localStorage.getItem('xgToken')
@@ -268,6 +329,7 @@ async function xgySearch(isbn, isBatch = false) {
 	tableData.value.push(obj)
 }
 
+// 星辰搜索
 async function xcSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'xc' }
 	const { data: res } = await axios.get(`${baseUrl}/xc?isbn=${isbn}`)
@@ -293,6 +355,7 @@ async function xcSearch(isbn, isBatch = false) {
 	tableData.value.push(obj)
 }
 
+// 孔夫子搜索
 async function kfzSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'k' }
 	cookie.value = localStorage.getItem('kfzCookie')
@@ -329,6 +392,7 @@ async function kfzSearch(isbn, isBatch = false) {
 	}
 }
 
+// 获取孔夫子价格
 function getKfzPrice(m) {
 	let shippingPrice = 0
 	if (m.postage.shippingList.length) {
@@ -341,6 +405,7 @@ function getKfzPrice(m) {
 	}
 }
 
+// 查询孔夫子库存
 async function onQueryKfzStock(row) {
 	const { shopId, itemId } = row
 	cookie.value = localStorage.getItem('kfzCookie')
@@ -354,6 +419,7 @@ async function onQueryKfzStock(row) {
 	}
 }
 
+// 总搜索
 async function onSearch(isReset = false) {
 	isReset && (tableData.value = [])
 	if (isbn.value.split(';').length > 1) {
@@ -384,11 +450,15 @@ async function onSearch(isReset = false) {
 			}
 			selected.value.filter(f => !f.isCalc).forEach(e => {
 				if (e.price !== '-' && +e.price < 4) {
-					e.salePrice = 9
+					e.salePrice = 10
 					e.isCalc = true
+					e.quantity = 1
 				} else if (e.price !== '-' && +e.price >= 4) {
-					e.salePrice = Math.round(+e.price + 5)
+					e.salePrice = Math.ceil(+e.price + 5)
 					e.isCalc = true
+					e.quantity = 1
+				} else {
+					e.quantity = '-'
 				}
 			})
 		})
@@ -400,6 +470,7 @@ async function onSearch(isReset = false) {
 	
 }
 
+// 重置小谷token
 function onResetToken() {
 	ElMessageBox.prompt('请输入新的Token', '提示', {
     confirmButtonText: 'OK',
@@ -411,6 +482,7 @@ function onResetToken() {
 	.catch(() => {})
 }
 
+// 重置孔夫子cookie
 function onResetCookie() {
 	ElMessageBox.prompt('请输入新的Cookie', '提示', {
     confirmButtonText: 'OK',
@@ -422,10 +494,12 @@ function onResetCookie() {
 	.catch(() => {})
 }
 
+// 搜索文本清空
 function onClear() {
 	tableData.value = []
 }
 
+// 选中
 function onSelectClick(selection, row) {
 	if (!selection.length) {
 		selected.value.pop()
@@ -446,26 +520,38 @@ function onSelectClick(selection, row) {
 		if (e.price !== '-' && +e.price < 4) {
 			e.salePrice = 10
 			e.isCalc = true
+			e.quantity = 1
 		} else if (e.price !== '-' && +e.price >= 4) {
 			e.salePrice = Math.ceil(+e.price + 5)
 			e.isCalc = true
+			e.quantity = 1
+		} else {
+			e.quantity = '-'
 		}
 	})
 }
-function onShowExcel() {
+
+// 显示抽屉
+function onShowDrawer() {
 	drawerVisible.value = true
 }
+
+// 计算总价
 function calcTotalPrice() {
 	totalPrice.value = selected.value.filter(f => f.stock !== '-').reduce((curr, next) => {
-		return curr + (next.salePrice || 0)
+		return curr + (next.salePrice ? next.salePrice * next.quantity : 0)
 	}, 0)
 }
+
+// 计算总包裹数
 function calcTotalDeliver() {
 	const arr = selected.value.filter(f => f.stock !== '-').map(m => {
 		return m.platform !== 'k' ? m.platform : `${m.platform}${m.shopId}`
 	})
 	totalDeliver.value = new Set(arr).size
 }
+
+// 打开抽屉时
 function onDrawerOpen() {
 	calcTotalPrice()
 	calcTotalDeliver()
@@ -473,34 +559,42 @@ function onDrawerOpen() {
 		onQueryKfzStock(e)
 	})
 }
+
+// 删除
 function onDel(index) {
 	selected.value.splice(index, 1)
 	calcTotalPrice()
 	calcTotalDeliver()
 }
+
+// 清空
 function onReset() {
 	selected.value = []
 	calcTotalPrice()
 	calcTotalDeliver()
 }
+
+// 复制
 async function onCopy() {
 	let targetData = selected.value.map(m => {
 		return {
 			bookName: m.bookName.replaceAll('\n', ''),
 			isbn: m.platform === 'k' && m.qualityText === '全新' ? `${m.isbn}【全新】` : m.isbn,
-			salePrice: `￥${m.salePrice}` || '暂缺',
+			salePrice: m.salePrice ? `￥${m.salePrice}` : '-',
+			quantity: m.quantity ? m.quantity : '-',
+			totalPrice: m.salePrice ? `￥${m.salePrice * m.quantity}` : '-',
 			stock: m.stock || '-',
-			platform: m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform
+			platform: m.stock ? m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform : '-'
 		}
 	})
-	let str = ''
+	let str = `订单号【${orderNoComp.value}】\n书名\tISBN编号\t单本售价\t数量\t价格\t库存\t平台\n`
 	targetData.forEach(e => {
 		Object.keys(e).forEach(h => {
 			str += e[h] + '\t'
 		})
 		str += '\n'
 	})
-	str = `${str}总共：￥${totalPrice.value}\t${totalDeliver.value}个快递`
+	str = `${str}\n总价：￥${totalPrice.value}\t${totalDeliver.value}个快递`
 	await toClipboard(str)
 	ElMessage({
 		type: "success",
@@ -562,6 +656,6 @@ async function onCopy() {
 		display: none !important;
 	}
 	::v-deep(.el-drawer) {
-		width: 90vw !important;
+		width: 95vw !important;
 	}
 </style>
