@@ -663,7 +663,7 @@ function xgyAddCart() {
 				ElMessage.error('小谷Token已过期，请更新Token')
 			} else if (res.some(s => s.data.code === 400)) {
 				let idxArr = res.filter(f => f.data.code === 400).map((m, idx) => idx)
-				let str = selected.value.filter((f, idx) => idxArr.includes(idx)).map(m => m.bookName).join(',')
+				let str = x.filter((f, idx) => idxArr.includes(idx)).map(m => m.bookName).join(',')
 				ElMessage.error(`【${str}】商品限购4个`)
 			}
 			resolve(false)
