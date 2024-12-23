@@ -1,7 +1,7 @@
 <template>
 	<el-card class="card">
 		<el-row class="search_wrap" gutter="20">
-			<el-col :span="12">
+			<el-col :span="9">
 				<el-input
 					v-model="isbn"
 					clearable
@@ -11,14 +11,20 @@
 					@keyup.enter="onSearch(true)"
 				/>
 			</el-col>
-			<el-col :span="4">
-				<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
+			<el-col :span="3">
+				<el-button type="info" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 			</el-col>
-			<el-col :span="4">
-				<el-button type="warning" @click="onResetToken" style="width: 100%;">重置小谷Token</el-button>
+			<el-col :span="3">
+				<el-button type="success" @click="onSetXgToken" style="width: 100%;">设置小谷Token</el-button>
 			</el-col>
-			<el-col :span="4">
-				<el-button type="danger" @click="onResetCookie" style="width: 100%;">重置孔夫子Cookie</el-button>
+			<el-col :span="3">
+				<el-button type="danger" @click="onSetKfzCookie" style="width: 100%;">设置孔夫子Cookie</el-button>
+			</el-col>
+			<el-col :span="3">
+				<el-button type="primary" @click="onSetXcToken" style="width: 100%;">设置星辰Token</el-button>
+			</el-col>
+			<el-col :span="3">
+				<el-button type="warning" @click="onSetYlCookie" style="width: 100%;">设置有路Cookie</el-button>
 			</el-col>
 		</el-row>
 		<el-row class="table_wrap">
@@ -85,6 +91,10 @@
 			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
 				<template #header="{ close, titleClass }">
 					<h4 :class="titleClass">订单号：{{ orderNoComp }}</h4>
+					<el-button type="success" @click="onCart">
+						<el-icon class="el-icon--left"><ShoppingCart /></el-icon>
+						加入购物车
+					</el-button>
 					<el-button type="primary" @click="onCopy">
 						<el-icon class="el-icon--left"><CopyDocument /></el-icon>
 						复制
@@ -185,6 +195,8 @@ const isbn = ref('')
 const tableData = ref([])
 const token = ref(localStorage.getItem('xgToken') || '')
 const cookie = ref(localStorage.getItem('kfzCookie') || '')
+const xcToken = ref(localStorage.getItem('xcToken') || '')
+const ylCookie = ref(localStorage.getItem('xcToken') || '')
 const selected = ref([])
 const drawerVisible = ref(false)
 const totalPrice = ref(0)
@@ -279,7 +291,8 @@ async function ylSearch(isbn, isBatch = false) {
 			return {
 				...obj,
 				bookName: $(el).text(),
-				cover: $('.book_face').children().first().children().first().attr('src')
+				cover: $('.book_face').children().first().children().first().attr('src'),
+				bookId
 			}
 		}).get()
 		const data = await Promise.all(arr)
@@ -318,6 +331,7 @@ async function xgySearch(isbn, isBatch = false) {
 		let hasStockItem = specs.find(f => f.stock > 0)
 		obj.price = hasStockItem ? hasStockItem.price : '-'
 		obj.stock = hasStockItem ? hasStockItem.stock : '-'
+		obj.specId = hasStockItem ? hasStockItem.id : ''
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
@@ -344,6 +358,7 @@ async function xcSearch(isbn, isBatch = false) {
 		obj.price = hasStockItem ? hasStockItem.nowPrice : '-'
 		obj.stock = hasStockItem ? hasStockItem.inventory : '-'
 		obj.originPrice = hasStockItem ? hasStockItem.integralPrice : '-'
+		obj.specItem = hasStockItem
 	} else {
 		obj.bookName = '-'
 		obj.price = '-'
@@ -471,7 +486,7 @@ async function onSearch(isReset = false) {
 }
 
 // 重置小谷token
-function onResetToken() {
+function onSetXgToken() {
 	ElMessageBox.prompt('请输入新的Token', '提示', {
     confirmButtonText: 'OK',
     cancelButtonText: 'Cancel'
@@ -483,13 +498,39 @@ function onResetToken() {
 }
 
 // 重置孔夫子cookie
-function onResetCookie() {
+function onSetKfzCookie() {
 	ElMessageBox.prompt('请输入新的Cookie', '提示', {
+    confirmButtonText: 'OK',
+    cancelButtonText: 'Cancel',
+		inputPlaceholder: 'PHPSESSID'
+	})
+	.then(({ value }) => {
+		localStorage.setItem('kfzCookie', value)
+	})
+	.catch(() => {})
+}
+
+// 设置星辰Token
+function onSetXcToken() {
+	ElMessageBox.prompt('请输入Token', '提示', {
     confirmButtonText: 'OK',
     cancelButtonText: 'Cancel'
 	})
 	.then(({ value }) => {
-		localStorage.setItem('kfzCookie', value)
+		localStorage.setItem('xcToken', value)
+	})
+	.catch(() => {})
+}
+
+// 设置有路Cookie
+function onSetYlCookie() {
+	ElMessageBox.prompt('请输入新的Cookie', '提示', {
+    confirmButtonText: 'OK',
+    cancelButtonText: 'Cancel',
+		inputPlaceholder: 'CokVisitorId'
+	})
+	.then(({ value }) => {
+		localStorage.setItem('ylCookie', value)
 	})
 	.catch(() => {})
 }
@@ -600,6 +641,116 @@ async function onCopy() {
 		type: "success",
 		message: "复制成功",
 	})
+}
+
+// 小谷加入购物车
+function xgyAddCart() {
+	return new Promise(async (resolve, reject) => {
+		if (!selected.value.some(s => s.platform === 'x')) {
+			resolve(true)
+			return
+		}
+		token.value = localStorage.getItem('xgToken')
+		let x = selected.value.filter(f => f.platform === 'x')
+		let promiseArr = x.map(m => {
+			return axios.get(`${baseUrl}/xiaoguya/addCart?specId=${m.specId}&token=${token.value}&count=${m.quantity}`)
+		})
+		const res = await Promise.all(promiseArr)
+		if (res.every(e => e.data.success)) {
+			resolve(true)
+		} else {
+			if (res.some(s => s.data.code === 401)) {
+				ElMessage.error('小谷Token已过期，请更新Token')
+			} else if (res.some(s => s.data.code === 400)) {
+				let idxArr = res.filter(f => f.data.code === 400).map((m, idx) => idx)
+				let str = selected.value.filter((f, idx) => idxArr.includes(idx)).map(m => m.bookName).join(',')
+				ElMessage.error(`【${str}】商品限购4个`)
+			}
+			resolve(false)
+		}
+	})
+}
+
+// 星辰加入购物车
+function xcAddCart() {
+	return new Promise(async (resolve, reject) => {
+		if (!selected.value.some(s => s.platform === 'xc')) {
+			resolve(true)
+			return
+		}
+		xcToken.value = localStorage.getItem('xcToken')
+		let xc = selected.value.filter(f => f.platform === 'xc')
+		let promiseArr = xc.map(m => {
+			const { bookId, conditionId, specificationId } = m.specItem
+			return axios.get(`${baseUrl}/xc/addCart?itemId=${bookId}&token=${xcToken.value}&num=${m.quantity}&conditionId=${conditionId}&specificationId=${specificationId}`)
+		})
+		const res = await Promise.all(promiseArr)
+		if (res.every(e => e.data.status === 200)) {
+			resolve(true)
+		} else {
+			if (res.some(s => s.data.code === 401)) {
+				ElMessage.error('请设置星辰Token')
+			}
+			resolve(false)
+		}
+	})
+}
+
+// 孔夫子加入购物车
+function kfzAddCart() {
+	return new Promise(async (resolve, reject) => {
+		if (!selected.value.some(s => s.platform === 'k')) {
+			resolve(true)
+			return
+		}
+		cookie.value = localStorage.getItem('kfzCookie')
+		let k = selected.value.filter(f => f.platform === 'k')
+		let promiseArr = k.map(m => {
+			const { shopId, itemId, quantity } = m
+			return axios.get(`${baseUrl}/kfz/addCart?itemId=${itemId}&shopId=${shopId}&numbers=${quantity}&cookie=${cookie.value}`)
+		})
+		const res = await Promise.all(promiseArr)
+		if (res.every(e => e.data.status === 1)) {
+			resolve(true)
+		} else {
+			resolve(false)
+		}
+	})
+}
+
+// 有路网加入购物车
+function ylAddCart() {
+	return new Promise(async (resolve, reject) => {
+		if (!selected.value.some(s => s.platform === 'y')) {
+			resolve(true)
+			return
+		}
+		ylCookie.value = localStorage.getItem('ylCookie')
+		let y = selected.value.filter(f => f.platform === 'y')
+		let promiseArr = y.map(m => {
+			const { bookId, quantity } = m
+			return axios.get(`${baseUrl}/youlu/addCart?bookId=${bookId}&buyCount=${quantity}&cookie=${ylCookie.value}`)
+		})
+		const res = await Promise.all(promiseArr)
+		if (res.every(e => e.data)) {
+			resolve(true)
+		} else {
+			resolve(false)
+		}
+	})
+}
+
+// 加入购物车
+async function onCart() {
+	const res = await Promise.all([xgyAddCart(), xcAddCart(), kfzAddCart(), ylAddCart()])
+	if (res.every(e => Boolean(e))) {
+		ElMessage.success('加入购物车成功')
+	} else {
+		!res[0] && ElMessage.error('小谷吖加入购物车失败')
+		!res[1] && ElMessage.error('星辰加入购物车失败')
+		!res[2] && ElMessage.error('孔夫子网加入购物车失败')
+		!res[3] && ElMessage.error('有路网加入购物车失败')
+	}
 }
 </script>
 
