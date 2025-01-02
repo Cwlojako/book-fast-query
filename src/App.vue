@@ -442,7 +442,7 @@ function onQueryKfzStock(row) {
 // 总搜索
 async function onSearch(isReset = false) {
 	isReset && (tableData.value = [])
-	if (isbn.value.split(';').length > 1) {
+	if (isbn.value.split('.').length > 1) {
 		let isbns = [...new Set(isbn.value.split('.'))]
 		console.log(isbns)
 		isbns.forEach(async e => {
