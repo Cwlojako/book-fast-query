@@ -1,29 +1,29 @@
 <template>
 	<el-card class="card">
 		<el-row class="search_wrap" gutter="20">
-			<el-col :span="9">
+			<el-col :xs="24" :sm="9">
 				<el-input
 					v-model="isbn"
 					clearable
 					style="width: 100%;"
-					placeholder="请输入isbn编号,多个时请用;分割开"
+					placeholder="请输入isbn编号,多个时用.分割开"
 					@clear="onClear"
 					@keyup.enter="onSearch(true)"
 				/>
 			</el-col>
-			<el-col :span="3">
+			<el-col :xs="24" :sm="3">
 				<el-button type="info" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 			</el-col>
-			<el-col :span="3">
+			<el-col :xs="24" :sm="3">
 				<el-button type="success" @click="onSetXgToken" style="width: 100%;">设置小谷Token</el-button>
 			</el-col>
-			<el-col :span="3">
+			<el-col :xs="24" :sm="3">
 				<el-button type="danger" @click="onSetKfzCookie" style="width: 100%;">设置孔夫子Cookie</el-button>
 			</el-col>
-			<el-col :span="3">
+			<el-col :xs="24" :sm="3">
 				<el-button type="primary" @click="onSetXcToken" style="width: 100%;">设置星辰Token</el-button>
 			</el-col>
-			<el-col :span="3">
+			<el-col :xs="24" :sm="3">
 				<el-button type="warning" @click="onSetYlCookie" style="width: 100%;">设置有路Cookie</el-button>
 			</el-col>
 		</el-row>
@@ -56,7 +56,7 @@
 				<el-table-column prop="stock" label="库存">
 					<template #default="scope">
 						<span v-if="scope.row.platform !== 'k'">{{ scope.row.stock }}</span>
-						<span v-if="scope.row.platform === 'k' && scope.row.price !== '-'" :class="{ 'stock_link': !scope.row.isQuery }" @click="onQueryKfzStock(scope.row)">
+						<span v-if="scope.row.platform === 'k' && scope.row.price" :class="{ 'stock_link': !scope.row.isQuery }" @click="onQueryKfzStock(scope.row)">
 							{{ scope.row.isQuery ? scope.row.stock : '查看库存'}}
 						</span>
 					</template>
@@ -74,7 +74,7 @@
 				<el-table-column prop="platform" label="平台">
 					<template #default="scope">
 						<p>{{ platformComp(scope.row.platform) }}</p>
-						<el-tag v-if="scope.row.platform === 'k' && scope.row.price !== '-'" :type="scope.row.isBought ? 'success' : 'primary'">
+						<el-tag v-if="scope.row.platform === 'k' && scope.row.price" :type="scope.row.isBought ? 'success' : 'primary'">
 							{{ scope.row.shopName }}
 						</el-tag>
 						<el-tag v-if="scope.row.platform === 'k'" type="danger">
@@ -91,22 +91,24 @@
 			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
 				<template #header="{ close, titleClass }">
 					<h4 :class="titleClass">订单号：{{ orderNoComp }}</h4>
-					<el-button type="success" @click="onCart">
-						<el-icon class="el-icon--left"><ShoppingCart /></el-icon>
-						加入购物车
-					</el-button>
-					<el-button type="primary" @click="onCopy">
-						<el-icon class="el-icon--left"><CopyDocument /></el-icon>
-						复制
-					</el-button>
-					<el-button type="warning" @click="onReset">
-						<el-icon class="el-icon--left"><DeleteFilled /></el-icon>
-						清空
-					</el-button>
-					<el-button type="danger" @click="close">
-						<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
-						关闭
-					</el-button>
+					<div>
+						<el-button type="success" @click="onCart">
+							<el-icon class="el-icon--left"><ShoppingCart /></el-icon>
+							加入购物车
+						</el-button>
+						<el-button type="primary" @click="onCopy">
+							<el-icon class="el-icon--left"><CopyDocument /></el-icon>
+							复制
+						</el-button>
+						<el-button type="warning" @click="onReset">
+							<el-icon class="el-icon--left"><DeleteFilled /></el-icon>
+							清空
+						</el-button>
+						<el-button type="danger" @click="close">
+							<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
+							关闭
+						</el-button>
+					</div>
 				</template>
 				<el-table 
 					:data="selected"
@@ -229,7 +231,7 @@ const orderNoComp = computed(() => {
 	const day = date.getDate() < 10 ? `0${date.getDate()}` : date.getDate()
 
 	const totalOriginPrice = selected.value.reduce((curr, next) => {
-		return curr + (next.price === '-' ? 0 : next.price * next.quantity)
+		return curr + (next.price ? next.price * next.quantity : 0)
 	}, 0)
 
 	const totalSalePrice = selected.value.reduce((curr, next) => {
@@ -286,8 +288,8 @@ async function ylSearch(isbn, isBatch = false) {
 			obj.originPrice = $(el).next().children().first().children().last().text().slice(1)
 			// 获取价格
 			const { data: priceDetail } = await axios.get(`${baseUrl}/youlu/detail?bookId=${bookId}`)
-			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : '-'
-			obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : '-'
+			obj.price = priceDetail.info ? JSON.parse(priceDetail.info).main.SalePriceVip : ''
+			obj.stock = priceDetail.info ? JSON.parse(priceDetail.info).main.StoreCounts : ''
 			return {
 				...obj,
 				bookName: $(el).text(),
@@ -301,9 +303,9 @@ async function ylSearch(isbn, isBatch = false) {
 		}
 		tableData.value = tableData.value.concat(data)
 	} else {
-		obj.bookName = '-'
-		obj.price = '-'
-		obj.stock = '-'
+		obj.bookName = ''
+		obj.price = ''
+		obj.stock = ''
 		if (isBatch) {
 			return [obj]
 		}
@@ -329,13 +331,13 @@ async function xgySearch(isbn, isBatch = false) {
 		const { data: priceDetail } = await axios.get(`${baseUrl}/xiaoguya/detail?bookId=${bookId}&token=${token.value}`)
 		let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
 		let hasStockItem = specs.find(f => f.stock > 0)
-		obj.price = hasStockItem ? hasStockItem.price : '-'
-		obj.stock = hasStockItem ? hasStockItem.stock : '-'
+		obj.price = hasStockItem ? hasStockItem.price : ''
+		obj.stock = hasStockItem ? hasStockItem.stock : ''
 		obj.specId = hasStockItem ? hasStockItem.id : ''
 	} else {
-		obj.bookName = '-'
-		obj.price = '-'
-		obj.stock = '-'
+		obj.bookName = ''
+		obj.price = ''
+		obj.stock = ''
 	}
 	if (isBatch) {
 		return [obj]
@@ -355,14 +357,14 @@ async function xcSearch(isbn, isBatch = false) {
 		const { data: priceDetail } = await axios.get(`${baseUrl}/xc/detail?bookId=${bookId}`)
 		let specs = priceDetail.data.sort((a, b) => a.nowPrice - b.nowPrice)
 		let hasStockItem = specs.find(f => f.inventory > 0)
-		obj.price = hasStockItem ? hasStockItem.nowPrice : '-'
-		obj.stock = hasStockItem ? hasStockItem.inventory : '-'
-		obj.originPrice = hasStockItem ? hasStockItem.integralPrice : '-'
+		obj.price = hasStockItem ? hasStockItem.nowPrice : ''
+		obj.stock = hasStockItem ? hasStockItem.inventory : ''
+		obj.originPrice = hasStockItem ? hasStockItem.integralPrice : ''
 		obj.specItem = hasStockItem
 	} else {
-		obj.bookName = '-'
-		obj.price = '-'
-		obj.stock = '-'
+		obj.bookName = ''
+		obj.price = ''
+		obj.stock = ''
 	}
 	if (isBatch) {
 		return [obj]
@@ -397,9 +399,9 @@ async function kfzSearch(isbn, isBatch = false) {
 		}
 		tableData.value = tableData.value.concat(arr)
 	} else {
-		obj.bookName = '-'
-		obj.price = '-'
-		obj.stock = '-'
+		obj.bookName = ''
+		obj.price = ''
+		obj.stock = ''
 		if (isBatch) {
 			return [obj]
 		}
@@ -421,39 +423,43 @@ function getKfzPrice(m) {
 }
 
 // 查询孔夫子库存
-async function onQueryKfzStock(row) {
-	const { shopId, itemId } = row
-	cookie.value = localStorage.getItem('kfzCookie')
-	const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}&cookie=${cookie.value}`)
-	row.isQuery = true
-	const $ = await cheerio.load(html)
-	if ($('.count-val').length) {
-		row.stock = $('.store-count').text()
-	} else {
-		row.stock = 1
-	}
+function onQueryKfzStock(row) {
+	return new Promise(async (resolve, reject) => {
+		const { shopId, itemId } = row
+		cookie.value = localStorage.getItem('kfzCookie')
+		const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}&cookie=${cookie.value}`)
+		row.isQuery = true
+		const $ = await cheerio.load(html)
+		if ($('.count-val').length) {
+			row.stock = $('.store-count').text()
+		} else {
+			row.stock = 1
+		}
+		resolve(row.stock)
+	})
 }
 
 // 总搜索
 async function onSearch(isReset = false) {
 	isReset && (tableData.value = [])
 	if (isbn.value.split(';').length > 1) {
-		let isbns = [...new Set(isbn.value.split(';'))]
+		let isbns = [...new Set(isbn.value.split('.'))]
+		console.log(isbns)
 		isbns.forEach(async e => {
 			let res = await Promise.all([ylSearch(e, true), xgySearch(e, true), xcSearch(e, true), kfzSearch(e, true)])
 			/*** 规则
 			 * 1、有小谷优先小谷
 			 * 2、没有小谷的话取星辰或有路网价格最低的
-			 * 3、再没有的话取孔夫子网的，需满足发货时长小于30小时的且价格最低的
+			 * 3、再没有的话取孔夫子网的，需满足发货时长小于24小时的且价格最低的
 			 * 4、都没有的话随机取第一个
 			 */
 			const [res1, res2, res3, res4] = res
 			const totalRes = res.reduce((curr, next) => {
 				return curr.concat(...next)
 			}, [])
-			const xg = totalRes.find(f => f.platform === 'x' && f.price !== '-')
-			const min = totalRes.filter(f => f.price !== '-' && f.platform !== 'k').sort((a, b) => a.price - b.price)[0]
-			const kfz = res4.filter(f => f.shopAvgShippingTime).sort((a, b) => (+a.price + +a.shopAvgShippingTime.match(/\d+/g)[0]) - (+b.price + +b.shopAvgShippingTime.match(/\d+/g)[0]))[0]
+			const xg = totalRes.find(f => f.platform === 'x' && f.price)
+			const min = totalRes.filter(f => f.price && !['k', 'x'].includes(f.platform)).sort((a, b) => a.price - b.price)[0]
+			const kfz = res4.filter(f => f.shopAvgShippingTime && +f.shopAvgShippingTime.match(/\d+/g) && +f.shopAvgShippingTime.match(/\d+/g)[0] < 24).sort((a, b) => (a.price - b.price))[0]
 			if (xg) {
 				selected.value.push(xg)
 			} else {
@@ -464,16 +470,16 @@ async function onSearch(isReset = false) {
 				}
 			}
 			selected.value.filter(f => !f.isCalc).forEach(e => {
-				if (e.price !== '-' && +e.price < 4) {
+				if (e.price && +e.price < 4) {
 					e.salePrice = 10
 					e.isCalc = true
 					e.quantity = 1
-				} else if (e.price !== '-' && +e.price >= 4) {
+				} else if (e.price && +e.price >= 4) {
 					e.salePrice = Math.ceil(+e.price + 5)
 					e.isCalc = true
 					e.quantity = 1
 				} else {
-					e.quantity = '-'
+					e.quantity = ''
 				}
 			})
 		})
@@ -488,8 +494,8 @@ async function onSearch(isReset = false) {
 // 重置小谷token
 function onSetXgToken() {
 	ElMessageBox.prompt('请输入新的Token', '提示', {
-    confirmButtonText: 'OK',
-    cancelButtonText: 'Cancel'
+		confirmButtonText: 'OK',
+		cancelButtonText: 'Cancel'
 	})
 	.then(({ value }) => {
 		localStorage.setItem('xgToken', value)
@@ -500,21 +506,24 @@ function onSetXgToken() {
 // 重置孔夫子cookie
 function onSetKfzCookie() {
 	ElMessageBox.prompt('请输入新的Cookie', '提示', {
-    confirmButtonText: 'OK',
-    cancelButtonText: 'Cancel',
+		confirmButtonText: 'OK',
+		cancelButtonText: '重新获取',
 		inputPlaceholder: 'PHPSESSID'
 	})
 	.then(({ value }) => {
 		localStorage.setItem('kfzCookie', value)
 	})
-	.catch(() => {})
+	.catch(async () => {
+		let { data: res } = await axios.get(`${baseUrl}/kfz/getCookie`)
+		ElMessage.success(res)
+	})
 }
 
 // 设置星辰Token
 function onSetXcToken() {
 	ElMessageBox.prompt('请输入Token', '提示', {
-    confirmButtonText: 'OK',
-    cancelButtonText: 'Cancel'
+		confirmButtonText: 'OK',
+		cancelButtonText: 'Cancel'
 	})
 	.then(({ value }) => {
 		localStorage.setItem('xcToken', value)
@@ -525,8 +534,8 @@ function onSetXcToken() {
 // 设置有路Cookie
 function onSetYlCookie() {
 	ElMessageBox.prompt('请输入新的Cookie', '提示', {
-    confirmButtonText: 'OK',
-    cancelButtonText: 'Cancel',
+		confirmButtonText: 'OK',
+		cancelButtonText: 'Cancel',
 		inputPlaceholder: 'CokVisitorId'
 	})
 	.then(({ value }) => {
@@ -558,16 +567,16 @@ function onSelectClick(selection, row) {
 		selected.value = cloneDeep(selected.value.concat(selection))
 	}
 	selected.value.filter(f => !f.isCalc).forEach(e => {
-		if (e.price !== '-' && +e.price < 4) {
+		if (e.price && +e.price < 4) {
 			e.salePrice = 10
 			e.isCalc = true
 			e.quantity = 1
-		} else if (e.price !== '-' && +e.price >= 4) {
+		} else if (e.price && +e.price >= 4) {
 			e.salePrice = Math.ceil(+e.price + 5)
 			e.isCalc = true
 			e.quantity = 1
 		} else {
-			e.quantity = '-'
+			e.quantity = ''
 		}
 	})
 }
@@ -579,26 +588,24 @@ function onShowDrawer() {
 
 // 计算总价
 function calcTotalPrice() {
-	totalPrice.value = selected.value.filter(f => f.stock !== '-').reduce((curr, next) => {
+	totalPrice.value = selected.value.filter(f => f.stock).reduce((curr, next) => {
 		return curr + (next.salePrice ? next.salePrice * next.quantity : 0)
 	}, 0)
 }
 
 // 计算总包裹数
 function calcTotalDeliver() {
-	const arr = selected.value.filter(f => f.stock !== '-').map(m => {
+	const arr = selected.value.filter(f => f.stock).map(m => {
 		return m.platform !== 'k' ? m.platform : `${m.platform}${m.shopId}`
 	})
 	totalDeliver.value = new Set(arr).size
 }
 
 // 打开抽屉时
-function onDrawerOpen() {
+async function onDrawerOpen() {
+	await Promise.all(selected.value.filter(f => f.platform === 'k' && f.price && !f.isQuery).map(m => onQueryKfzStock(m)))
 	calcTotalPrice()
 	calcTotalDeliver()
-	selected.value.filter(f => f.platform === 'k' && f.price !== '-' && !f.isQuery).forEach(e => {
-		onQueryKfzStock(e)
-	})
 }
 
 // 删除
@@ -653,7 +660,7 @@ function xgyAddCart() {
 		token.value = localStorage.getItem('xgToken')
 		let x = selected.value.filter(f => f.platform === 'x')
 		let promiseArr = x.map(m => {
-			return axios.get(`${baseUrl}/xiaoguya/addCart?specId=${m.specId}&token=${token.value}&count=${m.quantity}`)
+			return axios.get(`${baseUrl}/xiaoguya/addCart?specId=${m.specId}&token=${token.value}&count=${m.quantity}&isbn=${m.isbn}`)
 		})
 		const res = await Promise.all(promiseArr)
 		if (res.every(e => e.data.success)) {
@@ -662,8 +669,8 @@ function xgyAddCart() {
 			if (res.some(s => s.data.code === 401)) {
 				ElMessage.error('小谷Token已过期，请更新Token')
 			} else if (res.some(s => s.data.code === 400)) {
-				let idxArr = res.filter(f => f.data.code === 400).map((m, idx) => idx)
-				let str = x.filter((f, idx) => idxArr.includes(idx)).map(m => m.bookName).join(',')
+				let isbnArr = res.filter(f => f.data.code === 400).map(m => m.data.data.isbn)
+				let str = x.filter(f => isbnArr.includes(f.isbn)).map(m => m.bookName).join(',')
 				ElMessage.error(`【${str}】商品限购4个`)
 			}
 			resolve(false)
@@ -761,7 +768,13 @@ async function onCart() {
 		}
 	}
 	.search_wrap {
-		padding: 20px 32px 10px 32px;
+		padding: 10px 32px 10px 32px;
+		.el-input {
+			margin-top: 10px;
+		}
+		.el-button {
+			margin-top: 10px;
+		}
 	}
 	.table_wrap {
 		padding: 10px 32px;
@@ -808,5 +821,8 @@ async function onCart() {
 	}
 	::v-deep(.el-drawer) {
 		width: 95vw !important;
+		.el-drawer__header {
+			flex-wrap: wrap;
+		}
 	}
 </style>
