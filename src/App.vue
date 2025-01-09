@@ -169,6 +169,7 @@
 					<el-table-column label="操作">
 						<template #default="scope, index">
 							<el-button size="small" :icon="ICONDelete" type="warning" @click="onDel(scope.$index)" />
+							<el-button size="small" :icon="ICONCopy" type="primary" @click="onCopyItem(scope.row)" />
 						</template>
 					</el-table-column>
 				</el-table>
@@ -183,7 +184,7 @@
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Top, Bottom, Delete, Plus, Minus } from '@element-plus/icons-vue'
+import { Top, Bottom, Delete, Plus, Minus, CopyDocument } from '@element-plus/icons-vue'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
@@ -208,6 +209,7 @@ const ICONBottom = Bottom
 const ICONDelete = Delete
 const ICONPlus = Plus
 const ICONMinus = Minus
+const ICONCopy = CopyDocument
 
 const platformComp = computed(() => {
 	return (platform) => {
@@ -450,7 +452,7 @@ async function onSearch(isReset = false) {
 			/*** 规则
 			 * 1、有小谷优先小谷
 			 * 2、没有小谷的话取星辰或有路网价格最低的
-			 * 3、再没有的话取孔夫子网的，需满足发货时长小于24小时的且价格最低的
+			 * 3、再没有的话取孔夫子网的，需满足发货时长小于28小时的且价格最低的
 			 * 4、都没有的话随机取第一个
 			 */
 			const [res1, res2, res3, res4] = res
@@ -613,6 +615,15 @@ function onDel(index) {
 	selected.value.splice(index, 1)
 	calcTotalPrice()
 	calcTotalDeliver()
+}
+
+async function onCopyItem(row) {
+	let str = `${row.bookName}\t${row.isbn}\t${row.salePrice ? `￥${row.salePrice}` : '暂缺'}`
+	await toClipboard(str)
+	ElMessage({
+		type: "success",
+		message: "复制成功"
+	})
 }
 
 // 清空
