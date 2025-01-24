@@ -10,6 +10,16 @@
 					@clear="onClear"
 					@keyup.enter="onSearch(true)"
 				/>
+				<div class="tags">
+					<el-tag type="primary" @click="isbn = '9787040610536'">习概</el-tag>
+					<el-tag type="success" @click="isbn = '9787040599039'">毛概</el-tag>
+					<el-tag type="info" @click="isbn = '9787040599015'">近代史纲要</el-tag>
+					<el-tag type="warning" @click="isbn = '9787040599008'">马原</el-tag>
+					<el-tag type="danger" @click="isbn = '9787040599022'">思法</el-tag>
+					<el-tag type="primary" @click="isbn = '9787040617405'">国安读本</el-tag>
+					<el-tag type="success" @click="isbn = '9787040589818'">高数八上册</el-tag>
+					<el-tag type="info" @click="isbn = '9787040588682'">高数八下册</el-tag>
+				</div>
 			</el-col>
 			<el-col :xs="24" :sm="3">
 				<el-button type="info" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
@@ -785,6 +795,15 @@ async function onCart() {
 		}
 		.el-button {
 			margin-top: 10px;
+		}
+		.tags {
+			margin-top: 10px;
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+			.el-tag {
+				cursor: pointer;
+			}
 		}
 	}
 	.table_wrap {
