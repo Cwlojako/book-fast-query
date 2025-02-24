@@ -1,7 +1,7 @@
 <template>
 	<el-card class="card">
 		<el-row class="search_wrap" gutter="20">
-			<el-col :xs="24" :sm="9">
+			<el-col :xs="24" :sm="10">
 				<el-input
 					v-model="isbn"
 					clearable
@@ -19,22 +19,14 @@
 					<el-tag type="primary" @click="isbn = '9787040617405'">国安读本</el-tag>
 					<el-tag type="success" @click="isbn = '9787040589818'">高数八上册</el-tag>
 					<el-tag type="info" @click="isbn = '9787040588682'">高数八下册</el-tag>
+					<el-checkbox v-model="xcCanSearch">星辰</el-checkbox>
 				</div>
 			</el-col>
-			<el-col :xs="24" :sm="3">
-				<el-button type="info" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
+			<el-col :xs="24" :sm="7">
+				<el-button type="primary" @click="onSearch" style="width: 100%;" >查&nbsp;询</el-button>
 			</el-col>
-			<el-col :xs="24" :sm="3">
-				<el-button type="success" @click="onSetXgToken" style="width: 100%;">设置小谷Token</el-button>
-			</el-col>
-			<el-col :xs="24" :sm="3">
-				<el-button type="danger" @click="onSetKfzCookie" style="width: 100%;">设置孔夫子Cookie</el-button>
-			</el-col>
-			<el-col :xs="24" :sm="3">
-				<el-button type="primary" @click="onSetXcToken" style="width: 100%;">设置星辰Token</el-button>
-			</el-col>
-			<el-col :xs="24" :sm="3">
-				<el-button type="warning" @click="onSetYlCookie" style="width: 100%;">设置有路Cookie</el-button>
+			<el-col :xs="24" :sm="7">
+				<el-button type="warning" @click="settingVisible = true" style="width: 100%;">设置</el-button>
 			</el-col>
 		</el-row>
 		<el-row class="table_wrap">
@@ -81,9 +73,9 @@
 							preview-teleported/>
 					</template>
 				</el-table-column>
-				<el-table-column prop="platform" label="平台">
+				<el-table-column prop="platform" label="仓库">
 					<template #default="scope">
-						<p>{{ platformComp(scope.row.platform) }}</p>
+						<p>{{ scope.row.platform }}</p>
 						<el-tag v-if="scope.row.platform === 'k' && scope.row.price" :type="scope.row.isBought ? 'success' : 'primary'">
 							{{ scope.row.shopName }}
 						</el-tag>
@@ -98,7 +90,7 @@
 				<el-icon size="24"><Document /></el-icon>
 			</el-badge>
 
-			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen">
+			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen" class="drawer">
 				<template #header="{ close, titleClass }">
 					<h4 :class="titleClass">订单号：{{ orderNoComp }}</h4>
 					<div>
@@ -170,7 +162,7 @@
 								preview-teleported/>
 						</template>
 					</el-table-column>
-					<el-table-column prop="platform" label="平台">
+					<el-table-column prop="platform" label="仓库">
 						<template #default="scope, index">
 							<span v-if="scope.row.platform !== 'k'">{{ scope.row.platform }}</span>
 							<span v-else>{{ `${scope.row.platform}【${scope.row.shopName}】` }}</span>
@@ -187,6 +179,27 @@
 					<p>总金额<b style="color: #F56C6C;">￥{{ totalPrice }}</b></p>
 					<p style="margin-left: 50px;"><b style="color: #F56C6C;">{{ totalDeliver }}</b>个快递</p>
 				</el-row>
+			</el-drawer>
+
+			<el-drawer v-model="settingVisible" title="设置" direction="ltr" class="setting_drawer">
+				<el-form :model="form" label-width="auto">
+					<el-form-item label="小谷Token">
+						<el-input v-model="form.xgToken" />
+					</el-form-item>
+					<el-form-item label="星辰Token">
+						<el-input v-model="form.xcToken" />
+					</el-form-item>
+					<el-form-item label="旧书云Token">
+						<el-input v-model="form.jsyToken" />
+					</el-form-item>
+					<el-form-item label="有路Cookie">
+						<el-input v-model="form.ylCookie" />
+					</el-form-item>
+					<el-form-item label="孔夫子Cookie">
+						<el-input v-model="form.kfzCookie" />
+					</el-form-item>
+				</el-form>
+				<el-button @click="onSettingSave" type="primary" style="width: 100%;">保存</el-button>
 			</el-drawer>
 		</el-row>
 	</el-card>
@@ -206,12 +219,17 @@ const baseUrl = import.meta.env.VITE_BASE_URL
 const table = ref()
 const isbn = ref('')
 const tableData = ref([])
-const token = ref(localStorage.getItem('xgToken') || '')
-const cookie = ref(localStorage.getItem('kfzCookie') || '')
-const xcToken = ref(localStorage.getItem('xcToken') || '')
-const ylCookie = ref(localStorage.getItem('xcToken') || '')
+const xcCanSearch = ref(false)
 const selected = ref([])
+const form = reactive({
+	xgToken: localStorage.getItem('xgToken') || '',
+	xcToken: localStorage.getItem('xcToken') || '',
+	jsyToken: localStorage.getItem('jsyToken') || '',
+	ylCookie: localStorage.getItem('ylCookie') || '',
+	kfzCookie: localStorage.getItem('kfzCookie') || ''
+})
 const drawerVisible = ref(false)
+const settingVisible = ref(false)
 const totalPrice = ref(0)
 const totalDeliver = ref(0)
 const ICONTop = Top
@@ -221,20 +239,6 @@ const ICONPlus = Plus
 const ICONMinus = Minus
 const ICONCopy = CopyDocument
 
-const platformComp = computed(() => {
-	return (platform) => {
-		switch (platform) {
-			case 'y':
-				return '有路网'
-			case 'x':
-				return '小谷吖'
-			case 'k':
-				return '孔夫子'
-			case 'xc':
-				return '星辰'
-		}
-	}
-})
 
 const orderNoComp = computed(() => {
 	const date = new Date()
@@ -264,6 +268,8 @@ const rowClassName = ({ row }) => {
 		case 'k':
 			return 'warning-row'
 		case 'xc':
+			return 'primary-row'
+		case 'jsy':
 			return 'primary-row'
 	}
 }
@@ -328,8 +334,7 @@ async function ylSearch(isbn, isBatch = false) {
 // 小谷吖搜索
 async function xgySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'x' }
-	token.value = localStorage.getItem('xgToken')
-	const { data: res } = await axios.get(`${baseUrl}/xiaoguya?isbn=${isbn}&token=${token.value}`)
+	const { data: res } = await axios.get(`${baseUrl}/xiaoguya?isbn=${isbn}&token=${form.xgToken}`)
 	if (res.code === 401) {
 		ElMessage.error(res.message)
 		return 
@@ -340,7 +345,7 @@ async function xgySearch(isbn, isBatch = false) {
 		obj.cover = p[0].image
 		obj.originPrice = p[0].price
 		const bookId = p[0].id
-		const { data: priceDetail } = await axios.get(`${baseUrl}/xiaoguya/detail?bookId=${bookId}&token=${token.value}`)
+		const { data: priceDetail } = await axios.get(`${baseUrl}/xiaoguya/detail?bookId=${bookId}&token=${form.xgToken}`)
 		let specs = priceDetail.data.specs.sort((a, b) => a.price - b.price)
 		let hasStockItem = specs.find(f => f.stock > 0)
 		obj.price = hasStockItem ? hasStockItem.price : ''
@@ -360,7 +365,7 @@ async function xgySearch(isbn, isBatch = false) {
 // 星辰搜索
 async function xcSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'xc' }
-	const { data: res } = await axios.get(`${baseUrl}/xc?isbn=${isbn}`)
+	const { data: res } = await axios.get(`https://book.xclink.cn/xc-app/linkitembook/searchList?pageNum=0&pageSize=10&condition=${isbn}&typeId=&typeId2=&isStock=0&isPriceSort=0`)
 	if (res.data && res.data.total && res.data.list[0].isbn === isbn) {
 		const l = res.data.list[0]
 		obj.bookName = l.title
@@ -384,11 +389,34 @@ async function xcSearch(isbn, isBatch = false) {
 	tableData.value.push(obj)
 }
 
+
+// 旧书云搜索
+async function jsySearch(isbn, isBatch = false) {
+	let obj = { isbn, platform: 'jsy' }
+	const { data: res } = await axios.get(`${baseUrl}/jsy?isbn=${isbn}`)
+	if (res.status_code === 200 && res.data.data.length) {
+		const l = res.data.data[0]
+		obj.bookName = l.title
+		obj.cover = l.image
+		obj.price = l.price
+		obj.originPrice = l.original_price
+		obj.stock = l.stock
+		obj.bookId = l.id
+	} else {
+		obj.bookName = ''
+		obj.price = ''
+		obj.stock = ''
+	}
+	if (isBatch) {
+		return [obj]
+	}
+	tableData.value.push(obj)
+}
+
 // 孔夫子搜索
 async function kfzSearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'k' }
-	cookie.value = localStorage.getItem('kfzCookie')
-	const { data: res } = await axios.get(`${baseUrl}/kfz?isbn=${isbn}&cookie=${cookie.value}`)
+	const { data: res } = await axios.get(`${baseUrl}/kfz?isbn=${isbn}&cookie=${form.kfzCookie}`)
 	if (res.data.requestRejectAction === 'GO_LOGIN') {
 		ElMessage.error('孔夫子网未登录,请重试')
 		return
@@ -438,8 +466,7 @@ function getKfzPrice(m) {
 function onQueryKfzStock(row) {
 	return new Promise(async (resolve, reject) => {
 		const { shopId, itemId } = row
-		cookie.value = localStorage.getItem('kfzCookie')
-		const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}&cookie=${cookie.value}`)
+		const { data: html } = await axios.get(`${baseUrl}/kfz/detail?shopId=${shopId}&itemId=${itemId}&cookie=${form.kfzCookie}`)
 		row.isQuery = true
 		const $ = await cheerio.load(html)
 		if ($('.count-val').length) {
@@ -458,7 +485,10 @@ async function onSearch(isReset = false) {
 		let isbns = [...new Set(isbn.value.split('.'))]
 		console.log(isbns)
 		isbns.forEach(async e => {
-			let res = await Promise.all([ylSearch(e, true), xgySearch(e, true), xcSearch(e, true), kfzSearch(e, true)])
+			let searchArr = xcCanSearch.value ? 
+			[ylSearch(e, true), xcSearch(e, true), xgySearch(e, true), kfzSearch(e, true)] :
+			[ylSearch(e, true), xgySearch(e, true), kfzSearch(e, true)]
+			let res = await Promise.all(searchArr)
 			/*** 规则
 			 * 1、有小谷优先小谷
 			 * 2、没有小谷的话取星辰或有路网价格最低的
@@ -496,64 +526,24 @@ async function onSearch(isReset = false) {
 			})
 		})
 	} else {
-		await Promise.all([xgySearch(isbn.value), xcSearch(isbn.value), ylSearch(isbn.value)])
+		let searchArr = xcCanSearch.value ? 
+			[ylSearch(isbn.value), xcSearch(isbn.value), xgySearch(isbn.value), jsySearch(isbn.value)] :
+			[ylSearch(isbn.value), xgySearch(isbn.value), jsySearch(isbn.value)]
+		await Promise.all(searchArr)
 		// 孔夫子
 		kfzSearch(isbn.value)
 	}
 	
 }
 
-// 重置小谷token
-function onSetXgToken() {
-	ElMessageBox.prompt('请输入新的Token', '提示', {
-		confirmButtonText: 'OK',
-		cancelButtonText: 'Cancel'
-	})
-	.then(({ value }) => {
-		localStorage.setItem('xgToken', value)
-	})
-	.catch(() => {})
-}
-
-// 重置孔夫子cookie
-function onSetKfzCookie() {
-	ElMessageBox.prompt('请输入新的Cookie', '提示', {
-		confirmButtonText: 'OK',
-		cancelButtonText: '重新获取',
-		inputPlaceholder: 'PHPSESSID'
-	})
-	.then(({ value }) => {
-		localStorage.setItem('kfzCookie', value)
-	})
-	.catch(async () => {
-		let { data: res } = await axios.get(`${baseUrl}/kfz/getCookie`)
-		ElMessage.success(res)
-	})
-}
-
-// 设置星辰Token
-function onSetXcToken() {
-	ElMessageBox.prompt('请输入Token', '提示', {
-		confirmButtonText: 'OK',
-		cancelButtonText: 'Cancel'
-	})
-	.then(({ value }) => {
-		localStorage.setItem('xcToken', value)
-	})
-	.catch(() => {})
-}
-
-// 设置有路Cookie
-function onSetYlCookie() {
-	ElMessageBox.prompt('请输入新的Cookie', '提示', {
-		confirmButtonText: 'OK',
-		cancelButtonText: 'Cancel',
-		inputPlaceholder: 'CokVisitorId'
-	})
-	.then(({ value }) => {
-		localStorage.setItem('ylCookie', value)
-	})
-	.catch(() => {})
+function onSettingSave() {
+	localStorage.setItem('xgToken', form.xgToken)
+	localStorage.setItem('xcToken', form.xcToken)
+	localStorage.setItem('jsyToken', form.jsyToken)
+	localStorage.setItem('ylCookie', form.ylCookie)
+	localStorage.setItem('kfzCookie', form.kfzCookie)
+	ElMessage.success('保存成功')
+	settingVisible.value = false
 }
 
 // 搜索文本清空
@@ -678,10 +668,9 @@ function xgyAddCart() {
 			resolve(true)
 			return
 		}
-		token.value = localStorage.getItem('xgToken')
 		let x = selected.value.filter(f => f.platform === 'x')
 		let promiseArr = x.map(m => {
-			return axios.get(`${baseUrl}/xiaoguya/addCart?specId=${m.specId}&token=${token.value}&count=${m.quantity}&isbn=${m.isbn}`)
+			return axios.get(`${baseUrl}/xiaoguya/addCart?specId=${m.specId}&token=${form.xgToken}&count=${m.quantity}&isbn=${m.isbn}`)
 		})
 		const res = await Promise.all(promiseArr)
 		if (res.every(e => e.data.success)) {
@@ -706,11 +695,10 @@ function xcAddCart() {
 			resolve(true)
 			return
 		}
-		xcToken.value = localStorage.getItem('xcToken')
 		let xc = selected.value.filter(f => f.platform === 'xc')
 		let promiseArr = xc.map(m => {
 			const { bookId, conditionId, specificationId } = m.specItem
-			return axios.get(`${baseUrl}/xc/addCart?itemId=${bookId}&token=${xcToken.value}&num=${m.quantity}&conditionId=${conditionId}&specificationId=${specificationId}`)
+			return axios.get(`${baseUrl}/xc/addCart?itemId=${bookId}&token=${form.xcToken}&num=${m.quantity}&conditionId=${conditionId}&specificationId=${specificationId}`)
 		})
 		const res = await Promise.all(promiseArr)
 		if (res.every(e => e.data.status === 200)) {
@@ -731,11 +719,10 @@ function kfzAddCart() {
 			resolve(true)
 			return
 		}
-		cookie.value = localStorage.getItem('kfzCookie')
 		let k = selected.value.filter(f => f.platform === 'k')
 		let promiseArr = k.map(m => {
 			const { shopId, itemId, quantity } = m
-			return axios.get(`${baseUrl}/kfz/addCart?itemId=${itemId}&shopId=${shopId}&numbers=${quantity}&cookie=${cookie.value}`)
+			return axios.get(`${baseUrl}/kfz/addCart?itemId=${itemId}&shopId=${shopId}&numbers=${quantity}&cookie=${form.kfzCookie}`)
 		})
 		const res = await Promise.all(promiseArr)
 		if (res.every(e => e.data.status === 1)) {
@@ -753,11 +740,10 @@ function ylAddCart() {
 			resolve(true)
 			return
 		}
-		ylCookie.value = localStorage.getItem('ylCookie')
 		let y = selected.value.filter(f => f.platform === 'y')
 		let promiseArr = y.map(m => {
 			const { bookId, quantity } = m
-			return axios.get(`${baseUrl}/youlu/addCart?bookId=${bookId}&buyCount=${quantity}&cookie=${ylCookie.value}`)
+			return axios.get(`${baseUrl}/youlu/addCart?bookId=${bookId}&buyCount=${quantity}&cookie=${form.ylCookie}`)
 		})
 		const res = await Promise.all(promiseArr)
 		if (res.every(e => e.data)) {
@@ -768,9 +754,30 @@ function ylAddCart() {
 	})
 }
 
+// 旧书云加入购物车
+function jsyAddCart() {
+	return new Promise(async (resolve, reject) => {
+		if (!selected.value.some(s => s.platform === 'jsy')) {
+			resolve(true)
+			return
+		}
+		let jsy = selected.value.filter(f => f.platform === 'jsy')
+		let promiseArr = jsy.map(m => {
+			const { bookId, quantity } = m
+			return axios.get(`${baseUrl}/jsy/addCart?bookId=${bookId}&quantity=${quantity}&token=${form.jsyToken}`)
+		})
+		const res = await Promise.all(promiseArr)
+		if (res.every(e => e.data.status_code === 200)) {
+			resolve(true)
+		} else {
+			resolve(false)
+		}
+	})
+}
+
 // 加入购物车
 async function onCart() {
-	const res = await Promise.all([xgyAddCart(), xcAddCart(), kfzAddCart(), ylAddCart()])
+	const res = await Promise.all([xgyAddCart(), xcAddCart(), kfzAddCart(), ylAddCart(), jsyAddCart()])
 	if (res.every(e => Boolean(e))) {
 		ElMessage.success('加入购物车成功')
 	} else {
@@ -778,6 +785,7 @@ async function onCart() {
 		!res[1] && ElMessage.error('星辰加入购物车失败')
 		!res[2] && ElMessage.error('孔夫子网加入购物车失败')
 		!res[3] && ElMessage.error('有路网加入购物车失败')
+		!res[4] && ElMessage.error('旧书云加入购物车失败')
 	}
 }
 </script>
@@ -849,7 +857,7 @@ async function onCart() {
 	::v-deep(.el-table__header-wrapper .cell .el-checkbox__inner) {
 		display: none !important;
 	}
-	::v-deep(.el-drawer) {
+	::v-deep(.drawer) {
 		width: 95vw !important;
 		.el-drawer__header {
 			flex-wrap: wrap;
