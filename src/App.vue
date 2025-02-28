@@ -75,7 +75,7 @@
 				</el-table-column>
 				<el-table-column prop="platform" label="仓库">
 					<template #default="scope">
-						<p>{{ scope.row.platform }}</p>
+						<span v-if="scope.row.platform !== 'k'">{{ scope.row.platform }}</span>
 						<el-tag v-if="scope.row.platform === 'k' && scope.row.price" :type="scope.row.isBought ? 'success' : 'primary'">
 							{{ scope.row.shopName }}
 						</el-tag>
@@ -86,30 +86,44 @@
 				</el-table-column>
 			</el-table>
 
-			<el-badge class="selected_box" :value="selected.length" :offset="[-10, 0]" @click="onShowDrawer">
+			<el-badge class="entry_box selected" :value="selected.length" :offset="[-10, 0]" @click="onShowDrawer">
 				<el-icon size="24"><Document /></el-icon>
 			</el-badge>
 
+			<div class="entry_box history" @click="onShowHistory">
+				<el-icon size="24"><Notebook /></el-icon>
+			</div>
+
 			<el-drawer v-model="drawerVisible" :show-close="false" @open="onDrawerOpen" class="drawer">
-				<template #header="{ close, titleClass }">
-					<h4 :class="titleClass">订单号：{{ orderNoComp }}</h4>
-					<div>
-						<el-button type="success" @click="onCart">
-							<el-icon class="el-icon--left"><ShoppingCart /></el-icon>
-							加入购物车
-						</el-button>
-						<el-button type="primary" @click="onCopy">
-							<el-icon class="el-icon--left"><CopyDocument /></el-icon>
-							复制
-						</el-button>
-						<el-button type="warning" @click="onReset">
-							<el-icon class="el-icon--left"><DeleteFilled /></el-icon>
-							清空
-						</el-button>
-						<el-button type="danger" @click="close">
-							<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
-							关闭
-						</el-button>
+				<template #header="{ close }">
+					<div class="header_wrap">
+						<div class="left_area">
+							<p>快递数<b style="color: #F56C6C;">{{ totalDeliver }}</b>个</p>
+							<p>总金额<b style="color: #F56C6C;">￥{{ totalPrice }}</b></p>
+							<p>总收益<b style="color: #F56C6C;">￥{{ profit }}</b></p>
+						</div>
+						<div class="right_rea">
+							<el-button type="success" @click="onCart">
+								<el-icon class="el-icon--left"><ShoppingCart /></el-icon>
+								加入购物车
+							</el-button>
+							<el-button type="primary" @click="onSave">
+								<el-icon class="el-icon--left"><Notebook /></el-icon>
+								保存
+							</el-button>
+							<el-button type="primary" @click="onCopy">
+								<el-icon class="el-icon--left"><CopyDocument /></el-icon>
+								复制
+							</el-button>
+							<el-button type="warning" @click="onReset">
+								<el-icon class="el-icon--left"><DeleteFilled /></el-icon>
+								清空
+							</el-button>
+							<el-button type="danger" @click="close">
+								<el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
+								关闭
+							</el-button>
+						</div>
 					</div>
 				</template>
 				<el-table 
@@ -175,10 +189,6 @@
 						</template>
 					</el-table-column>
 				</el-table>
-				<el-row>
-					<p>总金额<b style="color: #F56C6C;">￥{{ totalPrice }}</b></p>
-					<p style="margin-left: 50px;"><b style="color: #F56C6C;">{{ totalDeliver }}</b>个快递</p>
-				</el-row>
 			</el-drawer>
 
 			<el-drawer v-model="settingVisible" title="设置" direction="ltr" class="setting_drawer">
@@ -195,25 +205,29 @@
 					<el-form-item label="有路Cookie">
 						<el-input v-model="form.ylCookie" />
 					</el-form-item>
-					<el-form-item label="孔夫子Cookie">
+					<el-form-item label="孔夫子Cookie" class="kfz_form_item">
 						<el-input v-model="form.kfzCookie" />
+						<el-button type="warning" @click="reGetkfzCookie" style="margin-left: 10px;">重新获取</el-button>
 					</el-form-item>
 				</el-form>
 				<el-button @click="onSettingSave" type="primary" style="width: 100%;">保存</el-button>
 			</el-drawer>
+
+			<history-drawer :visible="historyVisible" @update:visible="(val) => historyVisible = val"/>
 		</el-row>
 	</el-card>
 </template>
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Top, Bottom, Delete, Plus, Minus, CopyDocument } from '@element-plus/icons-vue'
+import { Top, Bottom, Delete, Plus, Minus, CopyDocument, List } from '@element-plus/icons-vue'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { cloneDeep } from 'lodash'
 import useClipboard from 'vue-clipboard3'
-import { onMounted } from 'vue'
+import { ref } from 'vue'
 const { toClipboard } = useClipboard()
+const $getUUID: any = inject('$getUUID')
 
 const baseUrl = import.meta.env.VITE_BASE_URL
 const table = ref()
@@ -230,6 +244,7 @@ const form = reactive({
 })
 const drawerVisible = ref(false)
 const settingVisible = ref(false)
+const historyVisible = ref(false)
 const totalPrice = ref(0)
 const totalDeliver = ref(0)
 const ICONTop = Top
@@ -239,16 +254,18 @@ const ICONPlus = Plus
 const ICONMinus = Minus
 const ICONCopy = CopyDocument
 
-
-const orderNoComp = computed(() => {
-	const date = new Date()
-	const year = date.getFullYear()
-	const month = date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
-	const day = date.getDate() < 10 ? `0${date.getDate()}` : date.getDate()
-
-	const totalOriginPrice = selected.value.reduce((curr, next) => {
+const profit = computed(() => {
+	let totalOriginPrice = selected.value.reduce((curr, next) => {
 		return curr + (next.price ? next.price * next.quantity : 0)
 	}, 0)
+
+	let kfz = selected.value.filter(f => f.platform === 'k')
+	if (kfz.length) {
+		const kfzTotal = kfz.reduce((curr, next) => {
+			return curr + (next.price ? next.price * next.quantity : 0)
+		}, 0)
+		totalOriginPrice += Number((kfzTotal * 0.006).toFixed(2))
+	}
 
 	const totalSalePrice = selected.value.reduce((curr, next) => {
 		return curr + (next.salePrice ? next.salePrice * next.quantity : 0)
@@ -256,7 +273,7 @@ const orderNoComp = computed(() => {
 
 	const profit = (totalSalePrice - totalOriginPrice).toFixed(2)
 
-	return `${year}${month}${day}-${profit}-${getRandom()}`
+	return profit
 })
 
 const rowClassName = ({ row }) => {
@@ -389,7 +406,6 @@ async function xcSearch(isbn, isBatch = false) {
 	tableData.value.push(obj)
 }
 
-
 // 旧书云搜索
 async function jsySearch(isbn, isBatch = false) {
 	let obj = { isbn, platform: 'jsy' }
@@ -486,12 +502,12 @@ async function onSearch(isReset = false) {
 		console.log(isbns)
 		isbns.forEach(async e => {
 			let searchArr = xcCanSearch.value ? 
-			[ylSearch(e, true), xcSearch(e, true), xgySearch(e, true), kfzSearch(e, true)] :
-			[ylSearch(e, true), xgySearch(e, true), kfzSearch(e, true)]
+			[ylSearch(e, true), xcSearch(e, true), xgySearch(e, true), jsySearch(e, true), kfzSearch(e, true)] :
+			[ylSearch(e, true), xgySearch(e, true), jsySearch(e, true), kfzSearch(e, true)]
 			let res = await Promise.all(searchArr)
 			/*** 规则
 			 * 1、有小谷优先小谷
-			 * 2、没有小谷的话取星辰或有路网价格最低的
+			 * 2、没有小谷的话取星辰/有路网/旧书云价格最低的
 			 * 3、再没有的话取孔夫子网的，需满足发货时长小于28小时的且价格最低的
 			 * 4、都没有的话随机取第一个
 			 */
@@ -546,6 +562,11 @@ function onSettingSave() {
 	settingVisible.value = false
 }
 
+async function reGetkfzCookie() {
+	let { data: res } = await axios.get(`${baseUrl}/kfz/getCookie`)
+	ElMessage.success(res)
+}
+
 // 搜索文本清空
 function onClear() {
 	tableData.value = []
@@ -586,6 +607,11 @@ function onSelectClick(selection, row) {
 // 显示抽屉
 function onShowDrawer() {
 	drawerVisible.value = true
+}
+
+// 显示历史抽屉
+function onShowHistory() {
+	historyVisible.value = true
 }
 
 // 计算总价
@@ -646,7 +672,7 @@ async function onCopy() {
 			platform: m.stock ? m.platform === 'k' ? `${m.platform}【${m.shopName}】` : m.platform : '-'
 		}
 	})
-	let str = `订单号【${orderNoComp.value}】\n书名\tISBN编号\t单本售价\t数量\t价格\t库存\t平台\n`
+	let str = `订单号【${orderNoComp.value}】\n书名\tISBN编号\t单本售价\t数量\t价格\t库存\t仓库\n`
 	targetData.forEach(e => {
 		Object.keys(e).forEach(h => {
 			str += e[h] + '\t'
@@ -788,6 +814,26 @@ async function onCart() {
 		!res[4] && ElMessage.error('旧书云加入购物车失败')
 	}
 }
+
+// 保存订单
+function onSave() {
+	let params = {
+		uuid: $getUUID(),
+		list: selected.value,
+		price: totalPrice.value,
+		profit: profit.value,
+		deliverCount: totalDeliver.value
+	}
+	ElMessageBox.prompt('请输入购买人昵称', '提示', {
+		confirmButtonText: '确定',
+		cancelButtonText: '取消'
+	}).then(async ({ value }) => {
+		params.buyer = value
+		await axios.post(`${baseUrl}/saveOrder`, params)
+		ElMessage.success('保存成功')
+	})
+}
+
 </script>
 
 <style lang="scss" scoped>
@@ -838,10 +884,9 @@ async function onCart() {
 			}
 		}
 	}
-	.selected_box {
+	.entry_box {
 		position: fixed;
 		right: 20px;
-		bottom: 20px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -853,6 +898,12 @@ async function onCart() {
 		color: #333;
 		cursor: pointer;
 		z-index: 99;
+		&.selected {
+			bottom: 20px;
+		}
+		&.history {
+			bottom: 90px;
+		}
 	}
 	::v-deep(.el-table__header-wrapper .cell .el-checkbox__inner) {
 		display: none !important;
@@ -861,6 +912,23 @@ async function onCart() {
 		width: 95vw !important;
 		.el-drawer__header {
 			flex-wrap: wrap;
+		}
+	}
+	.setting_drawer {
+		.kfz_form_item {
+			::v-deep .el-form-item__content {
+				flex-wrap: nowrap;
+			}
+		}
+	}
+	.header_wrap {
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		.left_area {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 20px;
 		}
 	}
 </style>
